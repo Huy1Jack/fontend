@@ -34,9 +34,11 @@ export default function UsersPage() {
       const response = await get_user();
       if (response.success) {
         setUsers(response.data);
+      } else {
+        message.error(response.message || 'Không thể tải danh sách người dùng');
       }
     } catch (error) {
-      message.error('Failed to fetch users');
+      message.error('Không thể tải danh sách người dùng');
     } finally {
       setLoading(false);
     }
@@ -97,17 +99,17 @@ export default function UsersPage() {
   };
 
   // Handle user deletion
-  const handleDelete = async (userId: number) => {
+  const handleDelete = async (user: User) => {
     try {
-      const response = await fetch(`/api/admin/users/${userId}`, {
-        method: 'DELETE',
-      });
-      if (response.ok) {
-        message.success('User deleted successfully');
+      const response = await del_user_admin({ email: user.email });
+      if (response.success) {
+        message.success('Xóa tài khoản thành công');
         fetchUsers();
+      } else {
+        message.error(response.message || 'Xóa tài khoản thất bại');
       }
     } catch (error) {
-      message.error('Failed to delete user');
+      message.error('Xóa tài khoản thất bại');
     }
   };
 
@@ -129,9 +131,10 @@ export default function UsersPage() {
       title: 'ID',
       dataIndex: 'id',
       key: 'id',
+      width: 80,
     },
     {
-      title: 'Name',
+      title: 'Tên',
       dataIndex: 'name',
       key: 'name',
     },
@@ -141,19 +144,19 @@ export default function UsersPage() {
       key: 'email',
     },
     {
-      title: 'Role',
+      title: 'Vai trò',
       dataIndex: 'role',
       key: 'role',
       render: (role: number) => getRoleName(role),
     },
     {
-      title: 'Created At',
+      title: 'Ngày tạo',
       dataIndex: 'created_at',
       key: 'created_at',
-      render: (date: string) => new Date(date).toLocaleDateString(),
+      render: (date: string) => new Date(date).toLocaleDateString('vi-VN'),
     },
     {
-      title: 'Actions',
+      title: 'Thao tác',
       key: 'actions',
       render: (_, record) => (
         <Space>
@@ -180,10 +183,11 @@ export default function UsersPage() {
           </Button>
           <Popconfirm
             title="Xóa tài khoản"
-            description="Bạn có chắc chắn muốn xóa tài khoản này?"
-            onConfirm={() => handleDelete(record.id)}
+            description={`Bạn có chắc chắn muốn xóa tài khoản "${record.name}" (${record.email})?`}
+            onConfirm={() => handleDelete(record)}
             okText="Có"
             cancelText="Không"
+            okButtonProps={{ danger: true }}
           >
             <Button danger icon={<DeleteOutlined />}>
               Xóa
@@ -203,16 +207,28 @@ export default function UsersPage() {
         dataSource={users}
         loading={loading}
         rowKey="id"
-        pagination={{ pageSize: 10 }}
+        pagination={{ 
+          pageSize: 10,
+          showTotal: (total) => `Tổng số: ${total} tài khoản`
+        }}
       />
 
       {/* Email Change Modal */}
       <Modal
         title="Đổi Email"
         open={emailModalVisible}
-        onCancel={() => setEmailModalVisible(false)}
+        onCancel={() => {
+          setEmailModalVisible(false);
+          emailForm.resetFields();
+        }}
         footer={null}
       >
+        {currentUser && (
+          <div className="mb-4">
+            <p><strong>Tài khoản:</strong> {currentUser.name}</p>
+            <p><strong>Email hiện tại:</strong> {currentUser.email}</p>
+          </div>
+        )}
         <Form
           form={emailForm}
           layout="vertical"
@@ -234,7 +250,10 @@ export default function UsersPage() {
               <Button type="primary" htmlType="submit">
                 Cập nhật
               </Button>
-              <Button onClick={() => setEmailModalVisible(false)}>
+              <Button onClick={() => {
+                setEmailModalVisible(false);
+                emailForm.resetFields();
+              }}>
                 Hủy
               </Button>
             </Space>
@@ -246,9 +265,18 @@ export default function UsersPage() {
       <Modal
         title="Đổi mật khẩu"
         open={passwordModalVisible}
-        onCancel={() => setPasswordModalVisible(false)}
+        onCancel={() => {
+          setPasswordModalVisible(false);
+          passwordForm.resetFields();
+        }}
         footer={null}
       >
+        {currentUser && (
+          <div className="mb-4">
+            <p><strong>Tài khoản:</strong> {currentUser.name}</p>
+            <p><strong>Email:</strong> {currentUser.email}</p>
+          </div>
+        )}
         <Form
           form={passwordForm}
           layout="vertical"
@@ -270,7 +298,10 @@ export default function UsersPage() {
               <Button type="primary" htmlType="submit">
                 Cập nhật
               </Button>
-              <Button onClick={() => setPasswordModalVisible(false)}>
+              <Button onClick={() => {
+                setPasswordModalVisible(false);
+                passwordForm.resetFields();
+              }}>
                 Hủy
               </Button>
             </Space>
