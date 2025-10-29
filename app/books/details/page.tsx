@@ -1,0 +1,807 @@
+'use client'
+
+import React, { useState, useEffect, useMemo } from 'react'
+import 'antd/dist/reset.css'
+import { Card, Descriptions, Typography, Row, Col, Tag, Space, Divider, Rate, Button, Image as AntImage, Modal, Form, Input, List, Avatar, message } from 'antd'
+import { BookOutlined, CalendarOutlined, FieldNumberOutlined, GlobalOutlined, HomeOutlined, TagsOutlined, DownloadOutlined, EyeOutlined, UserOutlined, StarOutlined, CommentOutlined, LoginOutlined } from '@ant-design/icons'
+import AuthModal from '@/app/components/AuthModal'
+import { useAuth } from '@/lib/hooks/useAuth'
+import { useTheme } from '@/lib/hooks/useTheme'
+import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
+import { show_books, add_book_review, show_book_reviews } from '@/app/sever/route'
+
+import Head from 'next/head'
+
+const { Title, Paragraph, Text } = Typography
+
+const BookDetailsPage: React.FC = () => {
+    const searchParams = useSearchParams()
+    const booksId = searchParams.get('books_id')
+    const { theme } = useTheme()
+
+    const [book, setBook] = React.useState<any | null>(null)
+    const [error, setError] = React.useState<string | null>(null)
+    const [favorites, setFavorites] = React.useState<Set<number>>(new Set())
+    const [previewModalVisible, setPreviewModalVisible] = React.useState<boolean>(false)
+    const [pdfUrl, setPdfUrl] = React.useState<string>('')
+    const [reviews, setReviews] = React.useState<any[]>([])
+    const [form] = Form.useForm()
+    const [submitting, setSubmitting] = React.useState(false)
+    const [showAuthModal, setShowAuthModal] = React.useState(false)
+    const { user } = useAuth()
+
+    // Hàm lấy danh sách đánh giá
+    const fetchReviews = async () => {
+        if (!booksId) return;
+        
+        try {
+            const response = await show_book_reviews({ booksId });
+            if (response.success) {
+                setReviews(response.data);
+            }
+        } catch (error) {
+            console.error('Error fetching reviews:', error);
+        }
+    };
+
+    // Hàm thêm đánh giá mới
+    const handleSubmitReview = async (values: any) => {
+        if (!user) {
+            setShowAuthModal(true);
+            return;
+        }
+        
+        if (!booksId) {
+            Modal.error({
+                title: 'Lỗi',
+                content: 'Không tìm thấy thông tin sách',
+                okText: 'Đóng'
+            });
+            return;
+        }
+
+        try {
+            setSubmitting(true);
+            const reviewData = {
+                books_id: booksId,
+                rating: values.rating,
+                comment: values.comment
+            };
+
+            console.log(reviewData)
+            
+            const response = await add_book_review(reviewData);
+            console.log(response)
+            if (response.success) {
+                Modal.success({
+                    title: 'Đánh giá thành công',
+                    content: 'Cảm ơn bạn đã đánh giá cuốn sách này!',
+                    okText: 'Đóng'
+                });
+                form.resetFields();
+                fetchReviews(); // Tải lại danh sách đánh giá
+            } else {
+                Modal.error({
+                    title: 'Lỗi',
+                    content: response.message || 'Có lỗi xảy ra khi gửi đánh giá',
+                    okText: 'Đóng'
+                });
+            }
+        } catch (error) {
+            Modal.error({
+                title: 'Lỗi',
+                content: 'Có lỗi xảy ra khi gửi đánh giá',
+                okText: 'Đóng'
+            });
+            console.error('Error submitting review:', error);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const resolveImageSrc = useMemo(() => (b: any): string => {
+        if (!b) return '/logo/logo.svg'
+        const raw = (b.coverUrl as string) || (b.image as string) || '/logo/logo.svg'
+        if (!raw || typeof raw !== 'string') return '/logo/logo.svg'
+        if (raw.startsWith('http://') || raw.startsWith('https://')) return raw
+        if (raw.startsWith('data:')) return raw
+        if (raw.startsWith('/')) return raw
+        return `/${raw.replace(/^\/+/, '')}`
+    }, [])
+
+    React.useEffect(() => {
+        fetchReviews();
+        const load = async () => {
+            try {
+                setError(null)
+                const res = await show_books()
+                if (res && res.success && Array.isArray(res.data)) {
+                    const found = res.data.find((b: any) => String(b.books_id ?? b.id) === String(booksId))
+                    setBook(found || null)
+                    if (!found) setError('Không tìm thấy sách')
+                } else {
+                    setError(res?.message || 'Không thể tải dữ liệu sách')
+                }
+            } catch (e: any) {
+                setError(e?.message || 'Lỗi tải dữ liệu')
+            }
+        }
+        if (booksId) load()
+    }, [booksId])
+
+    const [isClient, setIsClient] = React.useState(false)
+
+    React.useEffect(() => {
+        setIsClient(true)
+        try {
+            const raw = localStorage.getItem('favoriteBooks')
+            if (raw) setFavorites(new Set(JSON.parse(raw)))
+        } catch {}
+    }, [])
+
+    const isFav = (id: number | string | undefined) => {
+        if (!id) return false
+        const num = Number(id)
+        return favorites.has(num)
+    }
+
+    const toggleFav = (id: number | string | undefined) => {
+        if (!id) return
+        const num = Number(id)
+        setFavorites(prev => {
+            const next = new Set(prev)
+            if (next.has(num)) next.delete(num)
+            else next.add(num)
+            try { localStorage.setItem('favoriteBooks', JSON.stringify(Array.from(next))) } catch {}
+            return next
+        })
+    }
+
+    const tags: string[] = useMemo(() => {
+        if (!book) return []
+        if (Array.isArray(book.tags)) return book.tags
+        if (Array.isArray(book.Tags)) return book.Tags
+        return []
+    }, [book])
+
+    const description = useMemo(() => {
+        if (!book) return ''
+        return book.Description || book.description || 'Chưa có mô tả cho tài liệu này.'
+    }, [book])
+
+    const author = useMemo(() => {
+        if (!book) return 'Chưa cập nhật'
+        return book.Author || book.author || book.AUTHOR || 'Chưa cập nhật'
+    }, [book])
+
+    const category = useMemo(() => {
+        if (!book) return 'Chưa cập nhật'
+        return book.category_name || book.Category || book.category || book.CATEGORY || 'Chưa cập nhật'
+    }, [book])
+
+    return (
+        <div style={{ 
+            padding: '16px 12px', 
+            maxWidth: 1400, 
+            margin: '0 auto',
+            zoom: 1,
+            WebkitTransform: 'scale(1)',
+            transform: 'scale(1)',
+            backgroundColor: theme === 'dark' ? '#141414' : '#ffffff',
+            color: theme === 'dark' ? '#ffffff' : '#000000'
+        }}>
+            {book && (
+                <Head>
+                    <title>{`${book.Title || book.title} | Chi tiết sách`}</title>
+                    <meta name="description" content={description.slice(0, 160)} />
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+                    <link rel="canonical" href={process.env.NEXT_PUBLIC_BASE_URL + `/books/details?books_id=${booksId}`} />
+                    {/* Open Graph */}
+                    <meta property="og:type" content="article" />
+                    <meta property="og:title" content={book.Title || book.title} />
+                    <meta property="og:description" content={description.slice(0, 200)} />
+                    <meta property="og:image" content={resolveImageSrc(book)} />
+                    <meta property="og:url" content={process.env.NEXT_PUBLIC_BASE_URL + `/books/details?books_id=${booksId}`} />
+                    {/* Twitter */}
+                    <meta name="twitter:card" content="summary_large_image" />
+                    <meta name="twitter:title" content={book.Title || book.title} />
+                    <meta name="twitter:description" content={description.slice(0, 200)} />
+                    <meta name="twitter:image" content={resolveImageSrc(book)} />
+                    {/* JSON-LD */}
+                    <script
+                        type="application/ld+json"
+                        dangerouslySetInnerHTML={{
+                            __html: JSON.stringify({
+                                '@context': 'https://schema.org',
+                                '@type': 'Book',
+                                name: book.Title || book.title,
+                                author: author !== 'Chưa cập nhật' ? author : undefined,
+                                isbn: book.ISBN || book.isbn || undefined,
+                                inLanguage: book.Language || book.language || undefined,
+                                datePublished: book.PublishYear || book.publishYear || undefined,
+                                image: resolveImageSrc(book),
+                                description: description,
+                                publisher: book.Publisher || book.publisher || undefined,
+                                url: isClient ? window.location.href : '',
+                            }),
+                        }}
+                    />
+                </Head>
+            )}
+            
+            {!booksId && (
+                <Card 
+                    style={{ marginBottom: 16 }}
+                    styles={{
+                        body: {
+                            backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff',
+                            color: theme === 'dark' ? '#ffffff' : '#000000'
+                        }
+                    }}
+                >
+                    <Text type="danger">Thiếu tham số books_id</Text>
+                </Card>
+            )}
+
+            {error && (
+                <Card style={{ marginBottom: 16 }}>
+                    <Text type="danger">{error}</Text>
+                </Card>
+            )}
+
+            {!book ? (
+                <Card>Đang tải chi tiết sách...</Card>
+            ) : (
+                <Row gutter={[16, 16]}>
+                    <Col xs={24} md={9} lg={9}>
+                        <Card
+                            hoverable
+                            cover={
+                                <div style={{ padding: 12, background: '#f0f2f5' }}>
+                                    <AntImage
+                                        alt={book.Title || book.title}
+                                        src={resolveImageSrc(book)}
+                                        width="100%"
+                                        height={240}
+                                        style={{ 
+                                            objectFit: 'contain', 
+                                            borderRadius: 8, 
+                                            boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
+                                        }}
+                                        preview={true}
+                                        placeholder={
+                                            <div style={{ 
+                                                background: '#f5f5f5',
+                                                height: '100%',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center'
+                                            }}>
+                                                <BookOutlined style={{ fontSize: 24, color: '#bfbfbf' }} />
+                                            </div>
+                                        }
+                                    />
+                                </div>
+                            }
+                            styles={{ 
+                                    body: { 
+                                    padding: '12px',
+                                    backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff',
+                                    color: theme === 'dark' ? '#ffffff' : '#000000'
+                                }
+                            }}
+                        >
+                            <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                                <div>
+                                    <Text strong style={{ 
+                                        fontSize: 16, 
+                                        marginBottom: 8, 
+                                        display: 'block',
+                                        color: theme === 'dark' ? '#ffffff' : 'inherit'
+                                    }}>
+                                        Đánh giá
+                                    </Text>
+                                    <Space align="center" style={{ width: '100%', justifyContent: 'center' }}>
+                                    <Rate allowHalf value={Number(book.rate ?? 0)} disabled style={{ fontSize: 16 }} />
+                                        <Text type="secondary">
+                                            {isClient ? `(${book.rate ? '1' : '0'} đánh giá)` : ''}
+                                        </Text>
+                                    </Space>
+                                </div>
+                                
+                                {tags.length > 0 && (
+                                    <>
+                                        <Divider style={{ margin: '12px 0' }} />
+                                        <div>
+                                            <Text strong style={{ marginBottom: 8, display: 'block' }}>
+                                                Thẻ tag
+                                            </Text>
+                                            <Space wrap style={{ justifyContent: 'center' }}>
+                                                {tags.map((tag) => (
+                                                    <Tag 
+                                                        key={tag} 
+                                                        icon={<TagsOutlined />} 
+                                                        color="blue"
+                                                        style={{ margin: '4px', padding: '4px 8px' }}
+                                                    >
+                                                        {tag}
+                                                    </Tag>
+                                                ))}
+                                            </Space>
+                                        </div>
+                                    </>
+                                )}
+                            </Space>
+                        </Card>
+                    </Col>
+                    
+                    <Col xs={24} md={15} lg={15}>
+                        <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                            <Card
+                                styles={{
+                                    body: {
+                                        backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff',
+                                        color: theme === 'dark' ? '#ffffff' : '#000000'
+                                    }
+                                }}
+                            >
+                                <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                                    <div style={{ textAlign: 'left' }}>
+                                        <Title level={2} style={{ margin: 0, color: '#1890ff' }}>
+                                            {book.Title || book.title}
+                                        </Title>
+                                        <Text type="secondary" style={{ 
+                                            fontSize: 16, 
+                                            marginTop: 8, 
+                                            display: 'block',
+                                            color: theme === 'dark' ? 'rgba(255, 255, 255, 0.65)' : undefined
+                                        }}>
+                                            {book.DocumentType || book.documentType}
+                                        </Text>
+                                    </div>
+
+                                    <Divider style={{ margin: '16px 0' }} />
+
+                                    <Descriptions
+                                        column={1}
+                                        bordered
+                                        size="default"
+                                        labelStyle={{
+                                            backgroundColor: theme === 'dark' ? '#141414' : '#fafafa',
+                                            fontWeight: 500,
+                                            width: '180px',
+                                            padding: '16px 24px',
+                                            color: theme === 'dark' ? '#ffffff' : '#000000'
+                                        }}
+                                        contentStyle={{
+                                            backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff',
+                                            padding: '16px 24px',
+                                            color: theme === 'dark' ? '#ffffff' : '#000000'
+                                        }}
+                                    >
+                                        <Descriptions.Item 
+                                            label={<Space><BookOutlined />Tác giả</Space>}
+                                            labelStyle={{ color: '#1890ff' }}
+                                        >
+                                            <Text strong style={{ 
+                                                fontSize: 16,
+                                                color: theme === 'dark' ? '#ffffff' : 'inherit'
+                                            }}>{author}</Text>
+                                        </Descriptions.Item>
+
+                                        <Descriptions.Item 
+                                            label={<Space><HomeOutlined />Nhà xuất bản</Space>}
+                                            labelStyle={{ color: '#1890ff' }}
+                                        >
+                                            <Text style={{ color: theme === 'dark' ? '#ffffff' : 'inherit' }}>
+                                                {book.Publisher || book.publisher || 'Chưa cập nhật'}
+                                            </Text>
+                                        </Descriptions.Item>
+
+                                        <Descriptions.Item 
+                                            label={<Space><CalendarOutlined />Năm xuất bản</Space>}
+                                            labelStyle={{ color: '#1890ff' }}
+                                        >
+                                            <Text style={{ color: theme === 'dark' ? '#ffffff' : 'inherit' }}>
+                                                {book.PublishYear || book.publishYear || 'Chưa cập nhật'}
+                                            </Text>
+                                            
+                                        </Descriptions.Item>
+
+                                        <Descriptions.Item 
+                                            label={<Space><GlobalOutlined />Ngôn ngữ</Space>}
+                                            labelStyle={{ color: '#1890ff' }}
+                                        >
+                                            <Text style={{ color: theme === 'dark' ? '#ffffff' : 'inherit' }}>
+                                                {book.Language || book.Language || 'Chưa cập nhật'}
+                                            </Text>
+                                        </Descriptions.Item>
+                                    </Descriptions>
+
+                                </Space>
+                            </Card>
+
+                            <Card
+                                styles={{
+                                    body: {
+                                        backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff',
+                                        color: theme === 'dark' ? '#ffffff' : '#000000'
+                                    }
+                                }}
+                            >
+                                <Title level={4} style={{ color: '#1890ff', marginBottom: 16 }}>
+                                    Giới thiệu sách
+                                </Title>
+                                <Paragraph
+                                    style={{
+                                        textAlign: 'justify',
+                                        lineHeight: 2,
+                                        fontSize: '16px',
+                                        margin: 0,
+                                        color: theme === 'dark' ? '#ffffff' : '#262626'
+                                    }}
+                                    ellipsis={{
+                                        rows: 3,
+                                        expandable: true,
+                                        symbol: 'Xem thêm'
+                                    }}
+                                >
+                                    {description}
+                                </Paragraph>
+                            </Card>
+
+                            <Card
+                                styles={{
+                                    body: {
+                                        backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff',
+                                        color: theme === 'dark' ? '#ffffff' : '#000000',
+                                        padding: '16px'
+                                    }
+                                }}
+                            >
+                                <div style={{ 
+                                    display: 'flex', 
+                                    gap: '8px', 
+                                    width: '100%'
+                                }}>
+                                    <Button 
+                                        type="primary" 
+                                        icon={<BookOutlined />}
+                                        style={{
+                                            height: '40px',
+                                            flex: 1,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontWeight: 500,
+                                            padding: '4px 16px'
+                                        }}
+                                    >
+                                        Mượn sách
+                                    </Button>
+                                    <Button 
+                                        onClick={() => toggleFav(book.books_id ?? book.id)}
+                                        icon={<TagsOutlined />}
+                                        style={{
+                                            height: '40px',
+                                            flex: 1,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontWeight: 500,
+                                            padding: '4px 16px',
+                                            borderColor: theme === 'dark' ? '#434343' : undefined,
+                                            color: theme === 'dark' ? '#ffffff' : undefined,
+                                            backgroundColor: theme === 'dark' ? '#141414' : undefined
+                                        }}
+                                    >
+                                        {isFav(book.books_id ?? book.id) ? 'Đã thích' : 'Yêu thích'}
+                                    </Button>
+                                    <Button
+                                        type="primary"
+                                        icon={<EyeOutlined />}
+                                        onClick={() => {
+                                            // Sử dụng ID của sách để tạo đường dẫn PDF
+                                            const pdfUrl = `/books/${book.books_id}.pdf`;
+                                            // Kiểm tra xem file có tồn tại không
+                                            fetch(pdfUrl)
+                                                .then(response => {
+                                                    if (response.ok) {
+                                                        setPdfUrl(pdfUrl);
+                                                        setPreviewModalVisible(true);
+                                                    } else {
+                                                        throw new Error('PDF không tồn tại');
+                                                    }
+                                                })
+                                                .catch(() => {
+                                                    Modal.error({
+                                                        title: 'Lỗi',
+                                                        content: 'Không thể xem trước sách này. File PDF không tồn tại.',
+                                                    });
+                                                });
+                                        }}
+                                        style={{
+                                            height: '40px',
+                                            flex: 1,
+                                            margin: '0 4px',
+                                            backgroundColor: '#52c41a'
+                                        }}
+                                    >
+                                        Xem trước
+                                    </Button>
+                                    <Button
+                                        icon={<DownloadOutlined />}
+                                        onClick={() => {
+                                            const pdfUrl = `/books/${book.books_id}.pdf`;
+                                            // Kiểm tra xem file có tồn tại không trước khi tải xuống
+                                            fetch(pdfUrl)
+                                                .then(response => {
+                                                    if (response.ok) {
+                                                        return response.blob();
+                                                    }
+                                                    throw new Error('PDF không tồn tại');
+                                                })
+                                                .then(blob => {
+                                                    const url = window.URL.createObjectURL(blob);
+                                                    const link = document.createElement('a');
+                                                    link.href = url;
+                                                    link.download = `${book.Title || 'book'}.pdf`;
+                                                    document.body.appendChild(link);
+                                                    link.click();
+                                                    window.URL.revokeObjectURL(url);
+                                                    document.body.removeChild(link);
+                                                })
+                                                .catch(() => {
+                                                    Modal.error({
+                                                        title: 'Lỗi',
+                                                        content: 'Không thể tải xuống sách này. File PDF không tồn tại.',
+                                                    });
+                                                });
+                                        }}
+                                        style={{
+                                            height: '40px',
+                                            flex: 1,
+                                            margin: '0 4px'
+                                        }}
+                                        >
+                                            Tải về
+                                        </Button>
+                                </div>
+                            </Card>
+
+                                {/* Modal xem trước sách */}
+                            <Modal
+                                title={<Space><EyeOutlined /> Xem trước sách - {book.Title}</Space>}
+                                open={previewModalVisible}
+                                onCancel={() => setPreviewModalVisible(false)}
+                                footer={null}
+                                width="80%"
+                                style={{ top: 20 }}
+                                styles={{ 
+                                    body: { 
+                                        height: 'calc(90vh - 110px)', 
+                                        padding: 0,
+                                        backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff'
+                                    },
+                                    mask: {
+                                        backgroundColor: theme === 'dark' ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.45)'
+                                    },
+                                    content: {
+                                        backgroundColor: theme === 'dark' ? '#141414' : '#ffffff'
+                                    }
+                                }}
+                            >
+                                {pdfUrl ? (
+                                    <object
+                                        data={`${pdfUrl}#toolbar=0`}
+                                        type="application/pdf"
+                                        width="100%"
+                                        height="100%"
+                                        style={{ border: 'none' }}
+                                    >
+                                        <div style={{ padding: 24, textAlign: 'center' }}>
+                                            <p>Trình duyệt của bạn không hỗ trợ xem PDF trực tiếp.</p>
+                                            <Button 
+                                                type="primary" 
+                                                icon={<DownloadOutlined />}
+                                                onClick={() => window.open(pdfUrl, '_blank')}
+                                            >
+                                                Mở PDF trong tab mới
+                                            </Button>
+                                        </div>
+                                    </object>
+                                ) : (
+                                    <div style={{ padding: 24, textAlign: 'center' }}>
+                                        <p>Không thể tải file PDF. Vui lòng thử lại sau.</p>
+                                    </div>
+                                )}
+                            </Modal>
+
+                            {/* Auth Modal */}
+                            {showAuthModal && (
+                                <AuthModal onClose={() => setShowAuthModal(false)} />
+                            )}
+
+                            {/* Phần đánh giá */}
+                            <Card
+                                styles={{
+                                    body: {
+                                        backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff',
+                                        color: theme === 'dark' ? '#ffffff' : '#000000'
+                                    }
+                                }}
+                            >
+                                <Title level={4} style={{ color: '#1890ff', marginBottom: 16 }}>
+                                    <StarOutlined /> Đánh giá sách
+                                </Title>
+
+                                {/* Form đánh giá mới */}
+                                <Card 
+                                    bordered={false} 
+                                    style={{ 
+                                        marginBottom: 24, 
+                                        background: theme === 'dark' ? '#141414' : '#f9f9f9',
+                                        borderRadius: '8px',
+                                        boxShadow: theme === 'dark' ? '0 4px 12px rgba(0, 0, 0, 0.5)' : '0 4px 12px rgba(0, 0, 0, 0.1)'
+                                    }}
+                                    styles={{
+                                        body: {
+                                            backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff',
+                                            color: theme === 'dark' ? '#ffffff' : '#000000'
+                                        }
+                                    }}>
+                                    {user ? (
+                                        <Form
+                                            form={form}
+                                            onFinish={handleSubmitReview}
+                                            layout="vertical"
+                                        >
+                                            <Form.Item
+                                                name="rating"
+                                                rules={[{ required: true, message: 'Vui lòng cho điểm đánh giá!' }]}
+                                            >
+                                                <Rate 
+                                                    allowHalf 
+                                                    style={{ 
+                                                        fontSize: '24px',
+                                                        marginBottom: '12px' 
+                                                    }} 
+                                                />
+                                            </Form.Item>
+                                            <Form.Item
+                                                name="comment"
+                                                rules={[{ required: true, message: 'Vui lòng nhập nhận xét!' }]}
+                                            >
+                                                <Input.TextArea
+                                                    rows={4}
+                                                    placeholder="Chia sẻ cảm nghĩ của bạn về cuốn sách này..."
+                                                    style={{
+                                                        backgroundColor: theme === 'dark' ? '#141414' : '#ffffff',
+                                                        color: theme === 'dark' ? '#ffffff' : '#000000',
+                                                        borderColor: theme === 'dark' ? '#303030' : '#d9d9d9',
+                                                    }}
+                                                />
+                                            </Form.Item>
+                                            <Form.Item>
+                                                <Button
+                                                    type="primary"
+                                                    htmlType="submit"
+                                                    loading={submitting}
+                                                    icon={<CommentOutlined />}
+                                                >
+                                                    Gửi đánh giá
+                                                </Button>
+                                            </Form.Item>
+                                        </Form>
+                                    ) : (
+                                        <div style={{ textAlign: 'center', padding: '24px' }}>
+                                            <Space direction="vertical" size="middle" align="center">
+                                                <Text style={{ color: theme === 'dark' ? '#ffffff' : 'inherit' }}>
+                                                    Bạn cần đăng nhập để đánh giá sách
+                                                </Text>
+                                                <Button 
+                                                    type="primary" 
+                                                    icon={<LoginOutlined />}
+                                                    onClick={() => setShowAuthModal(true)}
+                                                >
+                                                    Đăng nhập ngay
+                                                </Button>
+                                            </Space>
+                                        </div>
+                                    )}
+                                </Card>
+
+                                {/* Danh sách đánh giá */}
+                                <List
+                                    itemLayout="horizontal"
+                                    dataSource={reviews}
+                                    style={{
+                                        backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff',
+                                        padding: '16px',
+                                        borderRadius: '8px'
+                                    }}
+                                    locale={{
+                                        emptyText: (
+                                            <div style={{ 
+                                                textAlign: 'center', 
+                                                padding: '32px 0',
+                                                backgroundColor: theme === 'dark' ? '#141414' : '#f9f9f9',
+                                                borderRadius: '8px'
+                                            }}>
+                                                <StarOutlined style={{ 
+                                                    fontSize: 32, 
+                                                    color: theme === 'dark' ? '#1f1f1f' : '#bfbfbf' 
+                                                }} />
+                                                <p style={{ 
+                                                    marginTop: 12, 
+                                                    color: theme === 'dark' ? 'rgba(255, 255, 255, 0.65)' : '#8c8c8c',
+                                                    fontSize: '16px'
+                                                }}>
+                                                    Chưa có đánh giá nào cho cuốn sách này
+                                                </p>
+                                            </div>
+                                        )
+                                    }}
+                                    renderItem={(review: any) => (
+                                        <List.Item>
+                                            <List.Item.Meta
+                                                avatar={
+                                                    <Avatar 
+                                                        icon={<UserOutlined />} 
+                                                        style={{
+                                                            backgroundColor: theme === 'dark' ? '#1890ff' : '#1890ff',
+                                                            color: '#ffffff'
+                                                        }}
+                                                    />
+                                                }
+                                                title={
+                                                    <Space align="center">
+                                                        <span style={{ 
+                                                            color: theme === 'dark' ? '#ffffff' : 'inherit',
+                                                            fontWeight: 500
+                                                        }}>
+                                                            {review.username || 'Ẩn danh'}
+                                                        </span>
+                                                        <Rate 
+                                                            disabled 
+                                                            defaultValue={review.rating} 
+                                                            style={{ fontSize: '16px' }}
+                                                        />
+                                                    </Space>
+                                                }
+                                                description={
+                                                    <div style={{
+                                                        backgroundColor: theme === 'dark' ? '#141414' : '#f9f9f9',
+                                                        padding: '12px',
+                                                        borderRadius: '8px',
+                                                        marginTop: '8px'
+                                                    }}>
+                                                        <p style={{ 
+                                                            margin: '0 0 8px 0',
+                                                            color: theme === 'dark' ? '#ffffff' : 'inherit',
+                                                            lineHeight: '1.6'
+                                                        }}>{review.comment}</p>
+                        
+                                                        <Text style={{ 
+                                                            color: theme === 'dark' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(0, 0, 0, 0.45)',
+                                                            fontSize: '12px'
+                                                        }}>
+                                                            {isClient ? new Date(review.review_date).toLocaleDateString('vi-VN') : ''}
+                                                        </Text>
+                                                    </div>
+                                                }
+                                            />
+                                        </List.Item>
+                                    )}
+                                />
+                            </Card>
+                        </Space>
+                    </Col>
+                </Row>
+            )}
+        </div>
+    )
+}
+
+export default BookDetailsPage

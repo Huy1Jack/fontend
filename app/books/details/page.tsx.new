@@ -1,0 +1,362 @@
+'use client'
+
+import React, { useState, useEffect } from 'react'
+import { Card, Typography, Row, Col, Tag, Space, Divider, Rate, Button, Image as AntImage, Form, Input, List, Avatar, message } from 'antd'
+import { BookOutlined, CalendarOutlined, FieldNumberOutlined, GlobalOutlined, HomeOutlined, TagsOutlined, DownloadOutlined, EyeOutlined, UserOutlined, StarOutlined, CommentOutlined } from '@ant-design/icons'
+import { useAuth } from '@/lib/hooks/useAuth'
+import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
+import { show_books } from '@/app/sever/route'
+
+const { Title, Text, Paragraph } = Typography
+const { TextArea } = Input
+
+interface Review {
+    id: number
+    user_id: number
+    books_id: number
+    rating: number
+    comment: string
+    created_at: string
+    user_name?: string
+}
+
+interface Book {
+    id: number
+    title: string
+    author: string
+    description: string
+    category: string
+    publisher: string
+    publish_date: string
+    page_count: number
+    language: string
+    cover_image?: string
+    pdf_url?: string
+}
+
+export default function BookDetails() {
+    const searchParams = useSearchParams()
+    const booksId = searchParams.get('id')
+    const { user } = useAuth()
+    
+    const [book, setBook] = useState<Book | null>(null)
+    const [error, setError] = useState<string | null>(null)
+    const [reviews, setReviews] = useState<Review[]>([])
+    const [loading, setLoading] = useState(true)
+    const [submitting, setSubmitting] = useState(false)
+    const [favorites, setFavorites] = useState<Set<number>>(new Set())
+    const [form] = Form.useForm()
+    const [previewVisible, setPreviewVisible] = useState(false)
+
+    // Load book data
+    useEffect(() => {
+        const loadBook = async () => {
+            try {
+                const response = await fetch('/api/show_books', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        api_key: 'changeme'
+                    })
+                })
+
+                const res = await response.json()
+                
+                if (res.success) {
+                    setError(null)
+                    const foundBook = res.data.find((b: any) => 
+                        String(b.books_id ?? b.id) === String(booksId)
+                    )
+                    setBook(foundBook || null)
+                    if (!foundBook) {
+                        setError('Không tìm thấy sách')
+                    }
+                } else {
+                    setError(res?.message || 'Không thể tải dữ liệu sách')
+                }
+            } catch (e: any) {
+                setError(e?.message || 'Lỗi tải dữ liệu')
+            } finally {
+                setLoading(false)
+            }
+        }
+
+        if (booksId) loadBook()
+    }, [booksId])
+
+    // Load reviews
+    useEffect(() => {
+        const loadReviews = async () => {
+            if (!booksId) return
+
+            try {
+                const response = await fetch('/api/show_book_reviews', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        api_key: 'changeme',
+                        datauser: { books_id: booksId }
+                    })
+                })
+
+                const data = await response.json()
+                if (data.success && data.data) {
+                    setReviews(data.data)
+                }
+            } catch (error) {
+                console.error('Error loading reviews:', error)
+            }
+        }
+
+        loadReviews()
+    }, [booksId])
+
+    // Load favorites from localStorage
+    useEffect(() => {
+        const loadFavorites = () => {
+            const raw = localStorage.getItem('favorites')
+            if (raw) {
+                setFavorites(new Set(JSON.parse(raw)))
+            }
+        }
+        loadFavorites()
+    }, [])
+
+    // Handle review submission
+    const handleSubmitReview = async (values: { rating: number; comment: string }) => {
+        if (!user || !booksId) {
+            message.warning('Vui lòng đăng nhập để đánh giá')
+            return
+        }
+
+        try {
+            setSubmitting(true)
+
+            const response = await fetch('/api/add_book_review', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    api_key: 'changeme',
+                    datauser: {
+                        books_id: booksId,
+                        user_id: user.id,
+                        rating: values.rating,
+                        comment: values.comment
+                    }
+                })
+            })
+
+            const data = await response.json()
+
+            if (data.success) {
+                message.success('Cảm ơn bạn đã đánh giá!')
+                form.resetFields()
+                
+                // Refresh reviews
+                const reviewsResponse = await fetch('/api/show_book_reviews', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        api_key: 'changeme',
+                        datauser: { books_id: booksId }
+                    })
+                })
+
+                const reviewsData = await reviewsResponse.json()
+                if (reviewsData.success && reviewsData.data) {
+                    setReviews(reviewsData.data)
+                }
+            } else {
+                message.error(data.message || 'Không thể gửi đánh giá')
+            }
+        } catch (error) {
+            console.error('Error submitting review:', error)
+            message.error('Có lỗi xảy ra khi gửi đánh giá')
+        } finally {
+            setSubmitting(false)
+        }
+    }
+
+    // Toggle PDF preview
+    const handlePreviewToggle = () => {
+        setPreviewVisible(!previewVisible)
+    }
+
+    if (error) {
+        return (
+            <div className="p-4">
+                <Text type="danger">{error}</Text>
+            </div>
+        )
+    }
+
+    if (!book) {
+        return (
+            <div className="p-4">
+                <Text>Đang tải...</Text>
+            </div>
+        )
+    }
+
+    const averageRating = reviews.length > 0
+        ? reviews.reduce((acc, review) => acc + review.rating, 0) / reviews.length
+        : 0
+
+    return (
+        <div className="p-4">
+            <Row gutter={[24, 24]}>
+                <Col xs={24} md={8}>
+                    <Card cover={
+                        <div style={{ height: 400, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                            <AntImage
+                                alt={book.title}
+                                src={book.cover_image || '/placeholder.png'}
+                                style={{ maxHeight: '100%', objectFit: 'contain' }}
+                            />
+                        </div>
+                    }>
+                        <Space direction="vertical" style={{ width: '100%' }}>
+                            {book.pdf_url && (
+                                <>
+                                    <Button 
+                                        icon={<EyeOutlined />} 
+                                        onClick={handlePreviewToggle}
+                                        block
+                                    >
+                                        Xem PDF
+                                    </Button>
+                                    <Button
+                                        icon={<DownloadOutlined />}
+                                        href={book.pdf_url}
+                                        target="_blank"
+                                        block
+                                    >
+                                        Tải PDF
+                                    </Button>
+                                </>
+                            )}
+                        </Space>
+                    </Card>
+                </Col>
+
+                <Col xs={24} md={16}>
+                    <Card>
+                        <Title level={2}>{book.title}</Title>
+                        <Space>
+                            <Rate disabled defaultValue={averageRating} />
+                            <Text>({reviews.length} đánh giá)</Text>
+                        </Space>
+
+                        <Divider />
+
+                        <Descriptions column={1}>
+                            <Descriptions.Item label={<><UserOutlined /> Tác giả</>}>
+                                {book.author}
+                            </Descriptions.Item>
+                            <Descriptions.Item label={<><BookOutlined /> Thể loại</>}>
+                                <Tag color="blue">{book.category}</Tag>
+                            </Descriptions.Item>
+                            <Descriptions.Item label={<><HomeOutlined /> Nhà xuất bản</>}>
+                                {book.publisher}
+                            </Descriptions.Item>
+                            <Descriptions.Item label={<><CalendarOutlined /> Ngày xuất bản</>}>
+                                {book.publish_date}
+                            </Descriptions.Item>
+                            <Descriptions.Item label={<><FieldNumberOutlined /> Số trang</>}>
+                                {book.page_count}
+                            </Descriptions.Item>
+                            <Descriptions.Item label={<><GlobalOutlined /> Ngôn ngữ</>}>
+                                {book.language}
+                            </Descriptions.Item>
+                        </Descriptions>
+
+                        <Divider />
+
+                        <Title level={4}>Mô tả</Title>
+                        <Paragraph>{book.description}</Paragraph>
+
+                        <Divider />
+
+                        <Title level={4}>Đánh giá & Nhận xét</Title>
+                        
+                        {user ? (
+                            <Form
+                                form={form}
+                                onFinish={handleSubmitReview}
+                                layout="vertical"
+                            >
+                                <Form.Item
+                                    name="rating"
+                                    label="Đánh giá của bạn"
+                                    rules={[{ required: true, message: 'Vui lòng chọn số sao' }]}
+                                >
+                                    <Rate />
+                                </Form.Item>
+                                <Form.Item
+                                    name="comment"
+                                    label="Nhận xét của bạn"
+                                    rules={[{ required: true, message: 'Vui lòng nhập nhận xét' }]}
+                                >
+                                    <TextArea rows={4} />
+                                </Form.Item>
+                                <Form.Item>
+                                    <Button 
+                                        type="primary" 
+                                        htmlType="submit"
+                                        loading={submitting}
+                                    >
+                                        Gửi đánh giá
+                                    </Button>
+                                </Form.Item>
+                            </Form>
+                        ) : (
+                            <Space>
+                                <Text>Vui lòng đăng nhập để đánh giá</Text>
+                                <Link href="/login">
+                                    <Button icon={<CommentOutlined />}>
+                                        Đăng nhập để đánh giá
+                                    </Button>
+                                </Link>
+                            </Space>
+                        )}
+
+                        <List
+                            itemLayout="horizontal"
+                            dataSource={reviews}
+                            renderItem={review => (
+                                <List.Item>
+                                    <List.Item.Meta
+                                        avatar={<Avatar icon={<UserOutlined />} />}
+                                        title={
+                                            <Space>
+                                                <Text strong>{review.user_name || 'Người dùng ẩn danh'}</Text>
+                                                <Rate disabled defaultValue={review.rating} />
+                                            </Space>
+                                        }
+                                        description={review.comment}
+                                    />
+                                </List.Item>
+                            )}
+                        />
+                    </Card>
+                </Col>
+            </Row>
+
+            <Modal
+                title="Xem PDF"
+                open={previewVisible}
+                onCancel={handlePreviewToggle}
+                width="80%"
+                footer={null}
+            >
+                {book.pdf_url && (
+                    <iframe
+                        src={book.pdf_url}
+                        style={{ width: '100%', height: '80vh' }}
+                    />
+                )}
+            </Modal>
+        </div>
+    )
+}
