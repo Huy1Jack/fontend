@@ -115,6 +115,62 @@ export async function get_authors_and_categories(datauser): Promise<any> {
 }
 
 
+export async function get_user(): Promise<any> {
+  const cookieStore = cookies();
+  const token = cookieStore.get("authToken")?.value || "Không có token";
+  try {
+    const response = await callPythonAPI("get_user", { token, api_key: API_KEY });
+    return response;
+  } catch (error) { 
+    return {
+      success: false,
+      message: error.message || "Check failed.",
+    };
+  }
+}
+
+export async function edit_email_admin(datauser): Promise<any> {
+  const cookieStore = cookies();
+ 
+  const token = cookieStore.get("authToken")?.value || "Không có token";
+  try {
+    const response = await callPythonAPI("edit_email_admin", { token, datauser, api_key: API_KEY });
+    return response;
+  } catch (error) { 
+    return {
+      success: false,
+      message: error.message || "Check failed.",
+    };
+  }
+}
+
+export async function edit_pass_admin(datauser): Promise<any> {
+  const cookieStore = cookies();
+  const token = cookieStore.get("authToken")?.value || "Không có token";
+  try {
+    const response = await callPythonAPI("edit_pass_admin", { token, datauser, api_key: API_KEY });
+    return response;
+  } catch (error) { 
+    return {
+      success: false,
+      message: error.message || "Check failed.",
+    };
+  }
+}
+
+export async function del_user_admin(datauser): Promise<any> {
+  const cookieStore = cookies();
+  const token = cookieStore.get("authToken")?.value || "Không có token";
+  try {
+    const response = await callPythonAPI("del_user_admin", { token, datauser, api_key: API_KEY });
+    return response;
+  } catch (error) { 
+    return {
+      success: false,
+      message: error.message || "Check failed.",
+    };
+  }
+}
 
 
 
