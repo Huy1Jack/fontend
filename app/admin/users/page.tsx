@@ -5,7 +5,7 @@ import { EditOutlined, DeleteOutlined, MailOutlined, LockOutlined } from '@ant-d
 import { get_user, edit_email_admin, edit_pass_admin, del_user_admin } from '@/app/sever/admin/route';
 import { useRouter } from 'next/navigation';
 import type { ColumnsType } from 'antd/es/table';
-
+import { getAuthCookie } from "@/app/sever/authcookie/route";
 interface User {
   id: number;
   name: string;
@@ -26,7 +26,24 @@ export default function UsersPage() {
 
   useEffect(() => {
     fetchUsers();
+    Check_user();
   }, []);
+
+  const Check_user = async () => {
+    try {
+      const token = await getAuthCookie();
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if ((payload.role == 1) || (payload.role == 2)) {
+      } else {
+        message.error("Bạn không có quyền truy cập trang này");
+        router.push('/');
+      }
+    } catch (error: any) {
+      message.error("Máy chủ không phản hồi");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
