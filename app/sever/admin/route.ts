@@ -74,8 +74,10 @@ export async function del_book_admin(datauser): Promise<any> {
 export async function add_book_admin(datauser): Promise<any> {
   const cookieStore = cookies();
   const token = cookieStore.get("authToken")?.value || "Không có token";
+  
   try {
     const response = await callPythonAPI("add_book_admin1", { token, datauser, api_key: API_KEY });
+    console.log(response)
     return response;
   } catch (error) {
     return {
@@ -89,7 +91,6 @@ export async function add_book_admin(datauser): Promise<any> {
 export async function edit_book_admin(datauser): Promise<any> {
   const cookieStore = cookies();
   const token = cookieStore.get("authToken")?.value || "Không có token";
-  console.log(datauser);
   try {
     const response = await callPythonAPI("edit_book_admin", { token, datauser, api_key: API_KEY });
     return response;
