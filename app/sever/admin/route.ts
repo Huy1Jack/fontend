@@ -42,7 +42,7 @@ async function callPythonAPI(endpoint: string, data: object): Promise<any> {
   }
 }
 
-export async function get_book_admin(datauser): Promise<any> {
+export async function get_book_admin(): Promise<any> {
   const cookieStore = cookies();
   const token = cookieStore.get("authToken")?.value || "Không có token";
   try {
@@ -85,11 +85,98 @@ export async function add_book_admin(datauser): Promise<any> {
   }
 }
 
+
+export async function edit_book_admin(datauser): Promise<any> {
+  const cookieStore = cookies();
+  const token = cookieStore.get("authToken")?.value || "Không có token";
+  console.log(datauser);
+  try {
+    const response = await callPythonAPI("edit_book_admin", { token, datauser, api_key: API_KEY });
+    return response;
+  } catch (error) {
+    return {
+      success: false,
+      message: error.message || "Check failed.",
+    };
+  }
+}
+
+export async function get_authors_and_categories(): Promise<any> {
+  const cookieStore = cookies();
+  const token = cookieStore.get("authToken")?.value || "Không có token";
+  try {
+    const response = await callPythonAPI("get_authors_and_categories", { token, api_key: API_KEY });
+    return response;
+  } catch (error) { 
+    return {
+      success: false,
+      message: error.message || "Check failed.",
+    };
+  }
+}
+
+
+export async function get_publishers(): Promise<any> {
+  const cookieStore = cookies();
+  const token = cookieStore.get("authToken")?.value || "Không có token";
+  try {
+    const response = await callPythonAPI("get_publishers", { token, api_key: API_KEY });
+    return response;
+  } catch (error) { 
+    return {
+      success: false,
+      message: error.message || "Check failed.",
+    };
+  }
+}
+
+export async function get_news(datauser): Promise<any> {
+  const cookieStore = cookies();
+  const token = cookieStore.get("authToken")?.value || "Không có token";
+  try {
+    const response = await callPythonAPI("get_news", { token, datauser, api_key: API_KEY });
+    return response;
+  } catch (error) { 
+    return {
+      success: false,
+      message: error.message || "Check failed.",
+    };
+  }
+}
+
 export async function get_authors(datauser): Promise<any> {
   const cookieStore = cookies();
   const token = cookieStore.get("authToken")?.value || "Không có token";
   try {
     const response = await callPythonAPI("get_authors", { token, datauser, api_key: API_KEY });
+    return response;
+  } catch (error) { 
+    return {
+      success: false,
+      message: error.message || "Check failed.",
+    };
+  }
+}
+
+export async function add_authors(datauser): Promise<any> {
+  const cookieStore = cookies();
+  const token = cookieStore.get("authToken")?.value || "Không có token";
+  try {
+    const response = await callPythonAPI("add_authors", { token, datauser, api_key: API_KEY });
+    return response;
+  } catch (error) { 
+    return {
+      success: false,
+      message: error.message || "Check failed.",
+    };
+  }
+}
+
+export async function del_authors(datauser): Promise<any> {
+  const cookieStore = cookies();
+  const token = cookieStore.get("authToken")?.value || "Không có token";
+  try {
+    const response = await callPythonAPI("del_authors", { token, datauser, api_key: API_KEY });
     return response;
   } catch (error) {
     return {
@@ -100,11 +187,12 @@ export async function get_authors(datauser): Promise<any> {
 }
 
 
-export async function get_authors_and_categories(datauser): Promise<any> {
+export async function edit_authors(datauser): Promise<any> {
   const cookieStore = cookies();
+ 
   const token = cookieStore.get("authToken")?.value || "Không có token";
   try {
-    const response = await callPythonAPI("get_authors_and_categories", { token, datauser, api_key: API_KEY });
+    const response = await callPythonAPI("edit_authors", { token, datauser, api_key: API_KEY });
     return response;
   } catch (error) { 
     return {
@@ -113,7 +201,6 @@ export async function get_authors_and_categories(datauser): Promise<any> {
     };
   }
 }
-
 
 export async function get_user(): Promise<any> {
   const cookieStore = cookies();
@@ -173,10 +260,89 @@ export async function del_user_admin(datauser): Promise<any> {
 }
 
 
+export async function add_publishers(datauser): Promise<any> {
+  const cookieStore = cookies();
+  const token = cookieStore.get("authToken")?.value || "Không có token";
+  try {
+    const response = await callPythonAPI("add_publishers", { token, datauser, api_key: API_KEY });
+    return response;
+  } catch (error) { 
+    return {
+      success: false,
+      message: error.message || "Check failed.",
+    };
+  }
+}
 
+export async function del_publishers(datauser): Promise<any> {
+  const cookieStore = cookies();
+  const token = cookieStore.get("authToken")?.value || "Không có token";
+  try {
+    const response = await callPythonAPI("del_publishers", { token, datauser, api_key: API_KEY });
+    return response;
+  } catch (error) { 
+    return {
+      success: false,
+      message: error.message || "Check failed.",
+    };
+  }
+}
 
+export async function edit_publishers(datauser): Promise<any> {
+  const cookieStore = cookies();
+  const token = cookieStore.get("authToken")?.value || "Không có token";
+  try {
+    const response = await callPythonAPI("edit_publishers", { token, datauser, api_key: API_KEY });
+    return response;
+  } catch (error) { 
+    return {
+      success: false,
+      message: error.message || "Check failed.",
+    };
+  }
+}
 
+export async function del_categories(datauser): Promise<any> {
+  const cookieStore = cookies();
+  const token = cookieStore.get("authToken")?.value || "Không có token";
+  try {
+    const response = await callPythonAPI("del_categories", { token, datauser, api_key: API_KEY });
+    return response;
+  } catch (error) { 
+    return {
+      success: false,
+      message: error.message || "Check failed.",
+    };
+  }
+}
 
+export async function add_categories(datauser): Promise<any> {
+  const cookieStore = cookies();
+  const token = cookieStore.get("authToken")?.value || "Không có token";
+  try {
+    const response = await callPythonAPI("add_categories", { token, datauser, api_key: API_KEY });
+    return response;
+  } catch (error) { 
+    return {
+      success: false,
+      message: error.message || "Check failed.",
+    };
+  }
+}
+
+export async function edit_categories(datauser): Promise<any> {
+  const cookieStore = cookies();
+  const token = cookieStore.get("authToken")?.value || "Không có token";
+  try {
+    const response = await callPythonAPI("edit_categories", { token, datauser, api_key: API_KEY });
+    return response;
+  } catch (error) { 
+    return {
+      success: false,
+      message: error.message || "Check failed.",
+    };
+  }
+}
 
 // export async function check_str(): Promise<any> {
 //   try {

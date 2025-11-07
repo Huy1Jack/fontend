@@ -103,7 +103,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose }) => {
                     // Login failed, show error message
                     setErrors(response.message || 'Thông tin đăng nhập không đúng')
                 }
-            } catch (error) {
+            }catch  (error) {
                 setErrors('Thông tin đăng nhập không đúng')
             }
             setIsLoading(false)

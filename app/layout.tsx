@@ -1,12 +1,9 @@
 import './globals.css'
 import 'antd/dist/reset.css'
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
 import { Providers } from './providers'
 import Layout from './components/Layout'
 import { headers } from 'next/headers'
-
-const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
     title: {
@@ -81,7 +78,7 @@ export default function RootLayout({
     const isAdmin = pathname.startsWith('/admin')
     return (
         <html lang="vi">
-            <body suppressHydrationWarning className={inter.className}>
+            <body suppressHydrationWarning className="font-sans">
                 <Providers>
                     {isAdmin ? (
                         children

@@ -49,14 +49,14 @@ export async function login_acc(datauser: any): Promise<any> {
   if (!datauser) {
     return {
       success: false,
-      message: "Missing data.",
+      message: "Không có dữ liệu.",
     };
   }
 
   try {
     const response = await callPythonAPI("login", { datauser, api_key: API_KEY });
     if (response.status === 200) {
-    
+
       const token = response.data.token;
       if (token) {
         setAuthCookie(token);
