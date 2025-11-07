@@ -330,6 +330,7 @@ export async function add_categories(datauser): Promise<any> {
   }
 }
 
+
 export async function edit_categories(datauser): Promise<any> {
   const cookieStore = cookies();
   const token = cookieStore.get("authToken")?.value || "Không có token";
@@ -343,6 +344,61 @@ export async function edit_categories(datauser): Promise<any> {
     };
   }
 }
+
+
+export async function get_borrow_return(): Promise<any> {
+  const cookieStore = cookies();
+  const token = cookieStore.get("authToken")?.value || "Không có token";
+  try {
+    const response = await callPythonAPI("get_borrow_return", { token, api_key: API_KEY });
+    return response;
+  } catch (error) { 
+    return {
+      success: false,
+      message: error.message || "Check failed.",
+    };
+  }
+}
+
+export async function add_borrow_return(datauser: any): Promise<any> {
+  const cookieStore = cookies();
+  const token = cookieStore.get("authToken")?.value || "Không có token";
+
+  try {
+    const response = await callPythonAPI("add_borrow_return", {
+      token,
+      api_key: API_KEY,
+      datauser,
+    });
+    return response;
+  } catch (error: any) {
+    return {
+      success: false,
+      message: error.message || "Lỗi khi thêm bản ghi mượn.",
+    };
+  }
+}
+
+
+export async function edit_borrow_return(datauser: any): Promise<any> {
+  const cookieStore = cookies();
+  const token = cookieStore.get("authToken")?.value || "Không có token";
+
+  try {
+    const response = await callPythonAPI("edit_borrow_return", {
+      token,
+      api_key: API_KEY,
+      datauser,
+    });
+    return response;
+  } catch (error: any) {
+    return {
+      success: false,
+      message: error.message || "Lỗi khi sửa bản ghi mượn.",
+    };
+  }
+}
+
 
 // export async function check_str(): Promise<any> {
 //   try {
