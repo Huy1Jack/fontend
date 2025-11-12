@@ -1,14 +1,93 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Button } from './ui/Button'
 import { MOCK_BOOKS } from '../../lib/constants'
 import BookCard from './BookCard'
+import { show_books } from '@/app/sever/route'
+import { Book } from '../../lib/types'
+
+// Hàm xử lý đường dẫn ảnh để đảm bảo format đúng cho next/image
+const resolveImageSrc = (imagePath: string | null | undefined): string => {
+    if (!imagePath || typeof imagePath !== 'string') return '/logo/logo.svg'
+    // Nếu là URL tuyệt đối hoặc data URL, giữ nguyên
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) return imagePath
+    if (imagePath.startsWith('data:')) return imagePath
+    // Nếu đã có dấu "/" ở đầu, giữ nguyên
+    if (imagePath.startsWith('/')) return imagePath
+    // Nếu không có dấu "/", thêm vào đầu
+    return `/${imagePath.replace(/^\/+/, '')}`
+}
 
 export default function HomePage() {
-    const featuredBooks = MOCK_BOOKS.slice(0, 4)
+    const [featuredBooks, setFeaturedBooks] = useState<Book[]>([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        const fetchFeaturedBooks = async () => {
+            try {
+                setLoading(true)
+                const response = await show_books()
+                
+                if (response.success && response.data) {
+                    const now = new Date()
+                    
+                    // Lọc sách có UploadDate trong vòng 7 ngày
+                    const recentBooks = (response.data || [])
+                        .filter((b: any) => {
+                            if (!b.UploadDate) return false
+                            const uploadDate = new Date(b.UploadDate)
+                            const daysDiff = (now.getTime() - uploadDate.getTime()) / (1000 * 60 * 60 * 24)
+                            return daysDiff <= 7 && daysDiff >= 0
+                        })
+                        .slice(0, 4) // Lấy tối đa 4 cuốn
+                        .map((b: any) => ({
+                            id: String(b.books_id ?? b.id ?? crypto.randomUUID()),
+                            title: b.Title ?? '',
+                            author: b.Author ?? '',
+                            publisher: b.Publisher ?? '',
+                            publishYear: b.PublishYear ?? 0,
+                            isbn: b.ISBN ?? '',
+                            category: b.Category ?? '',
+                            description: b.Description ?? '',
+                            coverUrl: resolveImageSrc(b.image),
+                            totalCopies: 0,
+                            availableCopies: 0,
+                            rating: 0,
+                            reviews: 0,
+                            tags: [],
+                            // Legacy fields
+                            books_id: b.books_id,
+                            Title: b.Title,
+                            Author: b.Author,
+                            Publisher: b.Publisher,
+                            DocumentType: b.DocumentType,
+                            Description: b.Description,
+                            ISBN: b.ISBN,
+                            PublishYear: b.PublishYear,
+                            Language: b.Language,
+                            IsPublic: b.IsPublic,
+                            UploadDate: b.UploadDate,
+                            UploadedBy: b.UploadedBy,
+                            image: b.image
+                        }))
+                    
+                    setFeaturedBooks(recentBooks)
+                } else {
+                    setFeaturedBooks([])
+                }
+            } catch (error) {
+                console.error('Error fetching featured books:', error)
+                setFeaturedBooks([])
+            } finally {
+                setLoading(false)
+            }
+        }
+
+        fetchFeaturedBooks()
+    }, [])
 
     return (
         <div className="min-h-screen bg-background text-foreground">
@@ -22,6 +101,7 @@ export default function HomePage() {
                                 <br />
                                 <span className="text-yellow-300">Đại Học Vinh</span>
                             </h1>
+                            
                             <p className="text-xl lg:text-2xl opacity-90">
                                 Khám phá kho tàng tri thức số với hơn 100,000 đầu sách.
                                 Mượn sách online 24/7, tìm kiếm thông minh, đặt phòng học nhóm.
@@ -74,27 +154,37 @@ export default function HomePage() {
             </section>
 
             {/* Featured Books Section */}
-            <section className="py-16 bg-muted/50">
-                <div className="container mx-auto px-4">
-                    <div className="text-center mb-12">
-                        <h2 className="text-3xl lg:text-4xl font-bold mb-4">Sách Nổi Bật</h2>
-                        <p className="text-muted-foreground max-w-2xl mx-auto">
-                            Khám phá những đầu sách được yêu thích nhất từ các lĩnh vực khoa học,
-                            công nghệ, kinh tế và nhân văn
-                        </p>
+            {featuredBooks.length > 0 && (
+                <section className="py-16 bg-muted/50">
+                    <div className="container mx-auto px-4">
+                        <div className="text-center mb-12">
+                            <h2 className="text-3xl lg:text-4xl font-bold mb-4">Sách Mới Tuần Này</h2>
+                            <p className="text-muted-foreground max-w-2xl mx-auto">
+                                Khám phá những đầu sách được yêu thích nhất từ các lĩnh vực khoa học,
+                                công nghệ, kinh tế và nhân văn
+                            </p>
+                        </div>
+                        {loading ? (
+                            <div className="text-center py-12">
+                                <p className="text-muted-foreground">Đang tải sách...</p>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+                                    {featuredBooks.map((book) => (
+                                        <BookCard key={book.id} book={book} />
+                                    ))}
+                                </div>
+                                <div className="text-center">
+                                    <Link href="/books">
+                                        <Button size="lg">Xem Tất Cả Sách</Button>
+                                    </Link>
+                                </div>
+                            </>
+                        )}
                     </div>
-                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-                        {featuredBooks.map((book) => (
-                            <BookCard key={book.id} book={book} />
-                        ))}
-                    </div>
-                    <div className="text-center">
-                        <Link href="/products">
-                            <Button size="lg">Xem Tất Cả Sách</Button>
-                        </Link>
-                    </div>
-                </div>
-            </section>
+                </section>
+            )}
 
             {/* Services Section */}
             <section className="py-16 bg-background">

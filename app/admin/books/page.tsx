@@ -325,7 +325,7 @@ export default function AdminBooks() {
       width: 100,
       render: (img: string) => (
         <img
-          src={img ? `/books/${img}` : "/books/default.jpg"}
+          src={img ? `/${img}` : "/books/default.jpg"}
           alt="Book cover"
           style={{
             width: 70,

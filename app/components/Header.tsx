@@ -7,10 +7,14 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useTheme } from '../../lib/hooks/useTheme'
 import { useAuth } from '../../lib/hooks/useAuth'
 import { useBorrow } from '../../lib/hooks/useBorrow'
-import { ShoppingCart, Sun, Moon, User, LogOut, Package, BookOpen } from 'lucide-react'
+import { ShoppingCart, Sun, Moon, User, LogOut, Package, BookOpen, Search } from 'lucide-react'
 import { Button } from './ui/Button'
+import { Input } from './ui/Input'
 import { UserRole } from '../../lib/types'
 import AuthModal from './AuthModal'
+import { show_book_search } from "@/app/sever/route";
+
+
 
 
 
@@ -22,13 +26,22 @@ const Header: React.FC = () => {
     const pathname = usePathname()
     const router = useRouter()
     const [isMenuOpen, setIsMenuOpen] = useState(false)
+    const [searchTerm, setSearchTerm] = useState('')
     const menuRef = useRef<HTMLDivElement>(null)
-
+    
     const handleLogout = async () => {
         await logout()
         setIsMenuOpen(false)
         router.push('/logout')
     }
+
+    const handleSearch = (e: React.FormEvent) => {
+        e.preventDefault()
+        if (searchTerm.trim() !== '') {
+            router.push(`/books?search=${encodeURIComponent(searchTerm.trim())}`)
+            setSearchTerm('')
+        }
+        }
 
     // Close menu when clicking outside
     useEffect(() => {
@@ -39,9 +52,7 @@ const Header: React.FC = () => {
         }
 
         document.addEventListener('mousedown', handleClickOutside)
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside)
-        }
+        return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
 
     // Close menu when route changes
@@ -62,60 +73,53 @@ const Header: React.FC = () => {
     return (
         <header className="sticky top-0 z-40 w-full border-b bg-background">
             <div className="container flex items-center h-16 max-w-7xl mx-auto px-4">
+                {/* Logo */}
                 <Link href="/" className="mr-6 flex items-center space-x-2">
-                    <Image
-                        src="/logo/logo.svg"
-                        alt="Logo Đại học Vinh"
-                        width={32}
-                        height={32}
-                        className="h-8 w-8"
-                    />
+                    <Image src="/logo/logo.svg" alt="Logo Đại học Vinh" width={32} height={32} className="h-8 w-8" />
                     <span className="font-bold">Thư viện Số VU</span>
                 </Link>
 
+                {/* Navbar */}
                 <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">
-                    <Link href="/" className={navLinkClasses('/')}>
-                        Trang Chủ
-                    </Link>
-                    <Link href="/books" className={navLinkClasses('/books')}>
-                        Sách
-                    </Link>
-                    <Link href="/my-books" className={navLinkClasses('/my-books')}>
-                        Sách yêu thích
-                    </Link>
-                    <Link href="/study-rooms" className={navLinkClasses('/study-rooms')}>
-                        Phòng học
-                    </Link>
-                    <Link href="/news" className={navLinkClasses('/news')}>
-                        Tin Tức
-                    </Link>
-                    <Link href="/about" className={navLinkClasses('/about')}>
-                        Giới Thiệu
-                    </Link>
+                    <Link href="/" className={navLinkClasses('/')}>Trang Chủ</Link>
+                    <Link href="/books" className={navLinkClasses('/books')}>Tra cứu sách</Link>
+
+                    <Link href="/about" className={navLinkClasses('/about')}>Giới Thiệu</Link>
                     {(user?.role === UserRole.LIBRARIAN || user?.role === UserRole.ADMIN) && (
-                        <Link href="/admin" className={navLinkClasses('/admin')}>
-                            Quản Lý
-                        </Link>
+                        <Link href="/admin" className={navLinkClasses('/admin')}>Quản Lý</Link>
                     )}
                 </nav>
 
-                <div className="flex flex-1 items-center justify-end space-x-2 sm:space-x-4">
-                    <Link href="/my-books" className="relative p-2" title="Sách đã mượn">
+                {/* Thanh tìm kiếm */}
+                <form
+                    onSubmit={handleSearch}
+                    className="ml-[300px] hidden md:flex flex-1 max-w-md mx-6 relative items-center"
+                >
+                    <Input
+                        type="text"
+                        placeholder="Tìm kiếm sách..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 pr-4 py-2 w-800px rounded-md border border-gray-300 dark:border-gray-700 bg-background focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <Search className="absolute left-3 text-gray-800 h-4 w-4" />
+                </form>
+
+                {/* Các nút chức năng bên phải */}
+                <div className="flex items-center justify-end space-x-2 sm:space-x-4">
+                    {/* <Link href="/my-books" className="relative p-2" title="Sách đã mượn">
                         <BookOpen className="h-5 w-5" />
                         {borrowedCount > 0 && (
                             <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-xs text-white">
                                 {borrowedCount}
                             </span>
                         )}
-                    </Link>
+                    </Link> */}
 
                     <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => {
-                            const newTheme = theme === 'dark' ? 'light' : theme === 'light' ? 'dark' : 'light'
-                            setTheme(newTheme)
-                        }}
+                        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                     >
                         {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                     </Button>
@@ -138,24 +142,12 @@ const Header: React.FC = () => {
                                             <p className="text-sm font-medium">{user.name}</p>
                                             <p className="text-xs text-muted-foreground">{user.email}</p>
                                         </div>
-                                        <Link
-                                            href="/profile"
-                                            className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                            onClick={() => setIsMenuOpen(false)}
-                                        >
-                                            Hồ sơ cá nhân
-                                        </Link>
-                                        <Link
-                                            href="/my-books"
-                                            className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                            onClick={() => setIsMenuOpen(false)}
-                                        >
-                                            Sách đã mượn
-                                        </Link>
+                                        <Link href="/profile" className="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">Hồ sơ cá nhân</Link>
+                                        <Link href="/my-books" className="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">Sách đã mượn</Link>
                                         <hr className="my-1" />
                                         <button
                                             onClick={handleLogout}
-                                            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                            className="flex items-center w-full px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
                                         >
                                             <LogOut className="h-4 w-4 mr-2" />
                                             Đăng xuất

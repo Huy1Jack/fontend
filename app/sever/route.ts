@@ -214,6 +214,37 @@ export async function show_book_reviews(datauser): Promise<any> {
     };
   }
 }
+
+
+export async function show_book_search(keyword: string): Promise<any> {
+  const cookieStore = cookies();
+  const token = cookieStore.get("authToken")?.value || "";
+
+  if (!keyword || keyword.trim() === "") {
+    return {
+      success: false,
+      message: "Thiếu từ khóa tìm kiếm.",
+    };
+  }
+
+  try {
+    const response = await callPythonAPI("show_book_search", {
+      api_key: API_KEY,
+      token,
+      keyword: keyword.trim(),
+    });
+
+    // Flask trả về { success, books, count } → giữ nguyên
+    return response;
+  } catch (error: any) {
+    console.error("❌ Lỗi khi gọi show_book_search:", error);
+    return {
+      success: false,
+      message: error?.message || "Lỗi khi gọi API show_book_search.",
+    };
+  }
+}
+
 // export async function check_str(): Promise<any> {
 //   try {
 //     const response = { "server": "Ziang - 2025", "domain": "ziii.me", "y": "2025" };

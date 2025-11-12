@@ -47,9 +47,8 @@ export default function AuthorsPage() {
     try {
       setLoading(true);
       const response = await get_authors_and_categories();
-      
       if (response.success) {
-        setAuthors(response.authors || []);
+        setAuthors(response.data.authors || []);
       } else {
         message.error(response.message || 'Lỗi khi tải dữ liệu tác giả');
       }

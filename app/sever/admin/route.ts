@@ -107,6 +107,7 @@ export async function get_authors_and_categories(): Promise<any> {
   const token = cookieStore.get("authToken")?.value || "Không có token";
   try {
     const response = await callPythonAPI("get_authors_and_categories", { token, api_key: API_KEY });
+    
     return response;
   } catch (error) { 
     return {

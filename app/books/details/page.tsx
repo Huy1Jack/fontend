@@ -528,7 +528,7 @@ const BookDetailsPage: React.FC = () => {
                                             backgroundColor: '#52c41a'
                                         }}
                                     >
-                                        Xem trước
+                                        Đọc Ngay
                                     </Button>
                                     <Button
                                         icon={<DownloadOutlined />}

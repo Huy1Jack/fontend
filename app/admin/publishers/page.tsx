@@ -27,15 +27,14 @@ export default function PublishersPage() {
 
   const handleAdd = () => {
     router.push('/admin/publishers/add');
-    message.info('Thêm mới tác giả');
+    message.info('Thêm mới nhà xuất bản');
   };  
   const fetchPublishers = async () => {
     try {
       setLoading(true);
       const response = await get_publishers();
-      
       if (response.success) {
-        setPublishers(response.publishers || []);
+        setPublishers(response.data || []);
       } else {
         message.error(response.message || 'Lỗi khi tải dữ liệu nhà xuất bản');
       }

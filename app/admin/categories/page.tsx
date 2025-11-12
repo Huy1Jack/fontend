@@ -28,7 +28,7 @@ export default function CategoriesPage() {
       const response = await get_authors_and_categories();
       
       if (response.success) {
-        setCategories(response.categories || []);
+        setCategories(response.data.categories || []);
       } else {
         message.error(response.message || 'Lỗi khi tải dữ liệu thể loại');
       }
