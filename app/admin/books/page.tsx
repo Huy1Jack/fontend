@@ -99,10 +99,7 @@ export default function AdminBooks() {
         return;
       }
 
-      const response = await get_book_admin({
-        token: token,
-        api_key: process.env.NEXT_PUBLIC_API_KEY,
-      });
+      const response = await get_book_admin();
 
       if (response.success && response.data) {
         setBooks(response.data);
@@ -119,9 +116,7 @@ export default function AdminBooks() {
 
   const fetchAuthorsAndCategories = async () => {
     try {
-      const response = await get_authors_and_categories({
-        api_key: process.env.NEXT_PUBLIC_API_KEY,
-      });
+      const response = await get_authors_and_categories();
       if (response.success && response.data) {
         setAuthors(response.data.authors || []);
         setCategories(response.data.categories || []);
@@ -133,9 +128,7 @@ export default function AdminBooks() {
 
   const fetchPublishers = async () => {
     try {
-      const response = await get_publishers({
-        api_key: process.env.NEXT_PUBLIC_API_KEY,
-      });
+      const response = await get_publishers();
       if (response.success && response.data) {
         setPublishers(response.data || []);
       }

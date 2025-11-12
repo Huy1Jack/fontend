@@ -4,6 +4,8 @@ import { Table, Space, Button, Input, Modal, message, Form } from 'antd';
 import { EditOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { get_authors_and_categories, del_categories, edit_categories } from '@/app/sever/admin/route';
 import type { ColumnsType } from 'antd/es/table';
+import { getAuthCookie } from '@/app/sever/authcookie/route';
+import { useRouter } from 'next/navigation';
 
 interface Category {
   category_id: number;
@@ -12,6 +14,7 @@ interface Category {
 }
 
 export default function CategoriesPage() {
+  const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -20,8 +23,28 @@ export default function CategoriesPage() {
 
   useEffect(() => {
     fetchCategories();
+    checkUser();
   }, []);
+  const checkUser = async () => {
+    try {
+      const token = await getAuthCookie();
+      if (!token) {
+        message.error("Bạn chưa đăng nhập");
+        router.push("/");
+        return;
+      }
 
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      if (![1, 2].includes(payload.role)) {
+        message.error("Bạn không có quyền truy cập trang này");
+        router.push("/");
+      }
+    } catch (error) {
+      console.error("Error checking user:", error);
+      message.error("Máy chủ không phản hồi");
+      router.push("/");
+    }
+  };
   const fetchCategories = async () => {
     try {
       setLoading(true);

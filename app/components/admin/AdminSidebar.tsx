@@ -51,7 +51,6 @@ export default function AdminSidebar() {
                 <NavItem href="/admin/author" label="Tác giả" icon={UserCog} />
                 <NavItem href="/admin/publishers" label="Nhà Xuất Bản" icon={UserCog} />
                 <NavItem href="/admin/borrows-return" label="Mượn - trả" icon={ClipboardList} />
-                <NavItem href="/admin/news" label="Tin tức" icon={ClipboardList} />
                 <NavItem href="/admin/users" label="Người dùng" icon={Users} />
                 {/* <NavItem href="/admin/settings" label="Cài đặt" icon={Settings} /> */}
             </nav>

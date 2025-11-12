@@ -178,13 +178,13 @@ export default function AboutPage() {
 
                 {/* Team Leadership */}
                 <div className="text-center mb-16">
-                    <h2 className="text-3xl font-bold mb-12">Ban Lãnh Đạo</h2>
+                    <h2 className="text-3xl font-bold mb-12">Nhóm phát triển</h2>
                     <div className="grid md:grid-cols-3 gap-8">
                         <div className="bg-white p-8 rounded-2xl shadow-sm border">
                             <div className="w-24 h-24 bg-blue-100 rounded-full mx-auto mb-4 flex items-center justify-center">
                                 <span className="text-2xl font-bold text-blue-600">GS</span>
                             </div>
-                            <h4 className="font-semibold text-lg mb-2">GS.TS Nguyễn Văn A</h4>
+                            <h4 className="font-semibold text-lg mb-2">HOÀNG TRONG HUY</h4>
                             <p className="text-blue-600 font-medium mb-2">Giám Đốc Thư Viện</p>
                             <p className="text-sm text-gray-600">
                                 20+ năm kinh nghiệm trong lĩnh vực quản lý thông tin và thư viện học
@@ -194,7 +194,7 @@ export default function AboutPage() {
                             <div className="w-24 h-24 bg-green-100 rounded-full mx-auto mb-4 flex items-center justify-center">
                                 <span className="text-2xl font-bold text-green-600">TS</span>
                             </div>
-                            <h4 className="font-semibold text-lg mb-2">TS. Trần Thị B</h4>
+                            <h4 className="font-semibold text-lg mb-2">HỒ HẢI ĐĂNG</h4>
                             <p className="text-green-600 font-medium mb-2">Phó Giám Đốc</p>
                             <p className="text-sm text-gray-600">
                                 Chuyên gia công nghệ thông tin với 15+ năm kinh nghiệm phát triển hệ thống
@@ -204,7 +204,7 @@ export default function AboutPage() {
                             <div className="w-24 h-24 bg-purple-100 rounded-full mx-auto mb-4 flex items-center justify-center">
                                 <span className="text-2xl font-bold text-purple-600">ThS</span>
                             </div>
-                            <h4 className="font-semibold text-lg mb-2">ThS. Lê Văn C</h4>
+                            <h4 className="font-semibold text-lg mb-2">NGUYỄN HOÀI ANH</h4>
                             <p className="text-purple-600 font-medium mb-2">Trưởng Phòng Kỹ Thuật</p>
                             <p className="text-sm text-gray-600">
                                 Kỹ sư phần mềm hàng đầu chuyên về AI và machine learning

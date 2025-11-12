@@ -402,6 +402,24 @@ export async function edit_borrow_return(datauser: any): Promise<any> {
 }
 
 
+export async function get_statistics(): Promise<any> {
+  const cookieStore = cookies();
+  const token = cookieStore.get("authToken")?.value || "Không có token";
+
+  try {
+    const response = await callPythonAPI("get_statistics", {
+      token,
+      api_key: API_KEY,
+    });
+    return response;
+  } catch (error: any) {
+    return {
+      success: false,
+      message: error.message || "Lỗi khi lấy thống kê.",
+    };
+  }
+}
+
 // export async function check_str(): Promise<any> {
 //   try {
 //     const response = { "server": "Ziang - 2025", "domain": "ziii.me", "y": "2025" };

@@ -31,7 +31,7 @@ import {
 } from "@/app/sever/admin/route";
 import dayjs from "dayjs";
 import { getAuthCookie } from "@/app/sever/authcookie/route";
-
+import { useRouter } from 'next/navigation';
 const { Search } = Input;
 const { Option } = Select;
 
@@ -66,7 +66,7 @@ export default function AdminBorrowReturn() {
   const [editingRecord, setEditingRecord] = useState<BorrowReturn | null>(null);
   const [currentUser, setCurrentUser] = useState<string>("Không xác định");
   const [form] = Form.useForm();
-
+  const router = useRouter();
   // ✅ Lấy danh sách mượn - trả
   const fetchBorrowReturn = async () => {
     try {
@@ -74,7 +74,6 @@ export default function AdminBorrowReturn() {
       const res = await get_borrow_return();
       if (res.success && res.data) {
         // Debug check để thấy last_updated_by
-        console.log("Danh sách mượn-trả:", res.data);
         setBorrowList(res.data);
       } else {
         message.error(res.message || "Không thể tải danh sách mượn trả");
@@ -123,12 +122,32 @@ export default function AdminBorrowReturn() {
   };
 
   useEffect(() => {
+    checkUser();
     fetchUsers();
     fetchBooks();
     fetchCurrentUser();
     fetchBorrowReturn();
   }, []);
+  const checkUser = async () => {
+    try {
+      const token = await getAuthCookie();
+      if (!token) {
+        message.error("Bạn chưa đăng nhập");
+        router.push("/");
+        return;
+      }
 
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      if (![1, 2].includes(payload.role)) {
+        message.error("Bạn không có quyền truy cập trang này");
+        router.push("/");
+      }
+    } catch (error) {
+      console.error("Error checking user:", error);
+      message.error("Máy chủ không phản hồi");
+      router.push("/");
+    }
+  };
   // ✅ Mở modal thêm/sửa
   const handleAddOrEdit = (record?: BorrowReturn) => {
     if (record) {

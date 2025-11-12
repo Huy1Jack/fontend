@@ -6,6 +6,7 @@ import { get_publishers, del_publishers, edit_publishers } from '@/app/sever/adm
 import type { ColumnsType } from 'antd/es/table';
 import { getAuthCookie } from "@/app/sever/authcookie/route";
 import { useRouter } from 'next/navigation';
+
 interface Publisher {
   publisher_id: number;
   publisher_name: string;
@@ -23,8 +24,28 @@ export default function PublishersPage() {
   const router = useRouter();
   useEffect(() => {
     fetchPublishers();
+    checkUser();
   }, []);
+  const checkUser = async () => {
+    try {
+      const token = await getAuthCookie();
+      if (!token) {
+        message.error("Bạn chưa đăng nhập");
+        router.push("/");
+        return;
+      }
 
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      if (![1, 2].includes(payload.role)) {
+        message.error("Bạn không có quyền truy cập trang này");
+        router.push("/");
+      }
+    } catch (error) {
+      console.error("Error checking user:", error);
+      message.error("Máy chủ không phản hồi");
+      router.push("/");
+    }
+  };
   const handleAdd = () => {
     router.push('/admin/publishers/add');
     message.info('Thêm mới nhà xuất bản');
