@@ -261,6 +261,19 @@ export async function del_user_admin(datauser): Promise<any> {
   }
 }
 
+export async function edit_role_admin(datauser): Promise<any> {
+  const cookieStore = cookies();
+  const token = cookieStore.get("authToken")?.value || "Không có token";
+  try {
+    const response = await callPythonAPI("edit_role_admin", { token, datauser, api_key: API_KEY });
+    return response;
+  } catch (error) { 
+    return {
+      success: false,
+      message: error.message || "Check failed.",
+    };
+  }
+}
 
 export async function add_publishers(datauser): Promise<any> {
   const cookieStore = cookies();

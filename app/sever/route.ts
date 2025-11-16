@@ -215,6 +215,25 @@ export async function show_book_reviews(datauser): Promise<any> {
   }
 }
 
+export async function get_statistics(datauser: any): Promise<any> {
+  if (!datauser) {
+    return {
+      success: false,
+      message: "Missing data.",
+    };
+  }
+
+  try {
+    const response = await callPythonAPI("get_statistics", { datauser, api_key: API_KEY });
+    return response;
+  } catch (error) {
+    return {
+      success: false,
+      message: error.message || "Check failed.",
+    };
+  }
+}
+
 
 export async function show_book_search(keyword: string): Promise<any> {
   const cookieStore = cookies();

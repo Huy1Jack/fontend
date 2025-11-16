@@ -6,7 +6,7 @@ import { Card, Descriptions, Typography, Row, Col, Tag, Space, Divider, Rate, Bu
 import { BookOutlined, CalendarOutlined, FieldNumberOutlined, GlobalOutlined, HomeOutlined, TagsOutlined, DownloadOutlined, EyeOutlined, UserOutlined, StarOutlined, CommentOutlined, LoginOutlined } from '@ant-design/icons'
 import AuthModal from '@/app/components/AuthModal'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { useTheme } from '@/lib/hooks/useTheme'
+import { useTheme } from '@/lib/context/ThemeContext'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { show_books, add_book_review, show_book_reviews } from '@/app/sever/route'
@@ -44,6 +44,17 @@ const BookDetailsPage: React.FC = () => {
             console.error('Error fetching reviews:', error);
         }
     };
+
+    const { averageRating, reviewCount } = useMemo(() => {
+        if (!reviews || reviews.length === 0) {
+            return { averageRating: 0, reviewCount: 0 };
+        }
+        const totalRating = reviews.reduce((acc, review) => acc + review.rating, 0);
+        return {
+            averageRating: totalRating / reviews.length,
+            reviewCount: reviews.length,
+        };
+    }, [reviews]);
 
     // Hàm thêm đánh giá mới
     const handleSubmitReview = async (values: any) => {
@@ -188,8 +199,6 @@ const BookDetailsPage: React.FC = () => {
             zoom: 1,
             WebkitTransform: 'scale(1)',
             transform: 'scale(1)',
-            backgroundColor: theme === 'dark' ? '#141414' : '#ffffff',
-            color: theme === 'dark' ? '#ffffff' : '#000000'
         }}>
             {book && (
                 <Head>
@@ -233,12 +242,6 @@ const BookDetailsPage: React.FC = () => {
             {!booksId && (
                 <Card 
                     style={{ marginBottom: 16 }}
-                    styles={{
-                        body: {
-                            backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff',
-                            color: theme === 'dark' ? '#ffffff' : '#000000'
-                        }
-                    }}
                 >
                     <Text type="danger">Thiếu tham số books_id</Text>
                 </Card>
@@ -287,8 +290,6 @@ const BookDetailsPage: React.FC = () => {
                             styles={{ 
                                     body: { 
                                     padding: '12px',
-                                    backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff',
-                                    color: theme === 'dark' ? '#ffffff' : '#000000'
                                 }
                             }}
                         >
@@ -298,14 +299,13 @@ const BookDetailsPage: React.FC = () => {
                                         fontSize: 16, 
                                         marginBottom: 8, 
                                         display: 'block',
-                                        color: theme === 'dark' ? '#ffffff' : 'inherit'
                                     }}>
                                         Đánh giá
                                     </Text>
                                     <Space align="center" style={{ width: '100%', justifyContent: 'center' }}>
-                                    <Rate allowHalf value={Number(book.rate ?? 0)} disabled style={{ fontSize: 16 }} />
+                                    <Rate allowHalf value={averageRating} disabled style={{ fontSize: 16 }} />
                                         <Text type="secondary">
-                                            {isClient ? `(${book.rate ? '1' : '0'} đánh giá)` : ''}
+                                            ({reviewCount} đánh giá)
                                         </Text>
                                     </Space>
                                 </div>
@@ -339,12 +339,6 @@ const BookDetailsPage: React.FC = () => {
                     <Col xs={24} md={15} lg={15}>
                         <Space direction="vertical" size={16} style={{ width: '100%' }}>
                             <Card
-                                styles={{
-                                    body: {
-                                        backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff',
-                                        color: theme === 'dark' ? '#ffffff' : '#000000'
-                                    }
-                                }}
                             >
                                 <Space direction="vertical" size={12} style={{ width: '100%' }}>
                                     <div style={{ textAlign: 'left' }}>
@@ -355,7 +349,6 @@ const BookDetailsPage: React.FC = () => {
                                             fontSize: 16, 
                                             marginTop: 8, 
                                             display: 'block',
-                                            color: theme === 'dark' ? 'rgba(255, 255, 255, 0.65)' : undefined
                                         }}>
                                             {book.DocumentType || book.documentType}
                                         </Text>
@@ -368,16 +361,12 @@ const BookDetailsPage: React.FC = () => {
                                         bordered
                                         size="default"
                                         labelStyle={{
-                                            backgroundColor: theme === 'dark' ? '#141414' : '#fafafa',
                                             fontWeight: 500,
                                             width: '180px',
                                             padding: '16px 24px',
-                                            color: theme === 'dark' ? '#ffffff' : '#000000'
                                         }}
                                         contentStyle={{
-                                            backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff',
                                             padding: '16px 24px',
-                                            color: theme === 'dark' ? '#ffffff' : '#000000'
                                         }}
                                     >
                                         <Descriptions.Item 
@@ -386,7 +375,6 @@ const BookDetailsPage: React.FC = () => {
                                         >
                                             <Text strong style={{ 
                                                 fontSize: 16,
-                                                color: theme === 'dark' ? '#ffffff' : 'inherit'
                                             }}>{author}</Text>
                                         </Descriptions.Item>
 
@@ -394,7 +382,7 @@ const BookDetailsPage: React.FC = () => {
                                             label={<Space><HomeOutlined />Nhà xuất bản</Space>}
                                             labelStyle={{ color: '#1890ff' }}
                                         >
-                                            <Text style={{ color: theme === 'dark' ? '#ffffff' : 'inherit' }}>
+                                            <Text>
                                                 {book.Publisher || book.publisher || 'Chưa cập nhật'}
                                             </Text>
                                         </Descriptions.Item>
@@ -403,7 +391,7 @@ const BookDetailsPage: React.FC = () => {
                                             label={<Space><CalendarOutlined />Năm xuất bản</Space>}
                                             labelStyle={{ color: '#1890ff' }}
                                         >
-                                            <Text style={{ color: theme === 'dark' ? '#ffffff' : 'inherit' }}>
+                                            <Text>
                                                 {book.PublishYear || book.publishYear || 'Chưa cập nhật'}
                                             </Text>
                                             
@@ -413,7 +401,7 @@ const BookDetailsPage: React.FC = () => {
                                             label={<Space><GlobalOutlined />Ngôn ngữ</Space>}
                                             labelStyle={{ color: '#1890ff' }}
                                         >
-                                            <Text style={{ color: theme === 'dark' ? '#ffffff' : 'inherit' }}>
+                                            <Text>
                                                 {book.Language || book.Language || 'Chưa cập nhật'}
                                             </Text>
                                         </Descriptions.Item>
@@ -423,12 +411,6 @@ const BookDetailsPage: React.FC = () => {
                             </Card>
 
                             <Card
-                                styles={{
-                                    body: {
-                                        backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff',
-                                        color: theme === 'dark' ? '#ffffff' : '#000000'
-                                    }
-                                }}
                             >
                                 <Title level={4} style={{ color: '#1890ff', marginBottom: 16 }}>
                                     Giới thiệu sách
@@ -439,7 +421,6 @@ const BookDetailsPage: React.FC = () => {
                                         lineHeight: 2,
                                         fontSize: '16px',
                                         margin: 0,
-                                        color: theme === 'dark' ? '#ffffff' : '#262626'
                                     }}
                                     ellipsis={{
                                         rows: 3,
@@ -452,34 +433,12 @@ const BookDetailsPage: React.FC = () => {
                             </Card>
 
                             <Card
-                                styles={{
-                                    body: {
-                                        backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff',
-                                        color: theme === 'dark' ? '#ffffff' : '#000000',
-                                        padding: '16px'
-                                    }
-                                }}
                             >
                                 <div style={{ 
                                     display: 'flex', 
                                     gap: '8px', 
                                     width: '100%'
                                 }}>
-                                    <Button 
-                                        type="primary" 
-                                        icon={<BookOutlined />}
-                                        style={{
-                                            height: '40px',
-                                            flex: 1,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            fontWeight: 500,
-                                            padding: '4px 16px'
-                                        }}
-                                    >
-                                        Mượn sách
-                                    </Button>
                                     <Button 
                                         onClick={() => toggleFav(book.books_id ?? book.id)}
                                         icon={<TagsOutlined />}
@@ -491,9 +450,6 @@ const BookDetailsPage: React.FC = () => {
                                             justifyContent: 'center',
                                             fontWeight: 500,
                                             padding: '4px 16px',
-                                            borderColor: theme === 'dark' ? '#434343' : undefined,
-                                            color: theme === 'dark' ? '#ffffff' : undefined,
-                                            backgroundColor: theme === 'dark' ? '#141414' : undefined
                                         }}
                                     >
                                         {isFav(book.books_id ?? book.id) ? 'Đã thích' : 'Yêu thích'}
@@ -582,14 +538,7 @@ const BookDetailsPage: React.FC = () => {
                                     body: { 
                                         height: 'calc(90vh - 110px)', 
                                         padding: 0,
-                                        backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff'
                                     },
-                                    mask: {
-                                        backgroundColor: theme === 'dark' ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.45)'
-                                    },
-                                    content: {
-                                        backgroundColor: theme === 'dark' ? '#141414' : '#ffffff'
-                                    }
                                 }}
                             >
                                 {pdfUrl ? (
@@ -625,12 +574,6 @@ const BookDetailsPage: React.FC = () => {
 
                             {/* Phần đánh giá */}
                             <Card
-                                styles={{
-                                    body: {
-                                        backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff',
-                                        color: theme === 'dark' ? '#ffffff' : '#000000'
-                                    }
-                                }}
                             >
                                 <Title level={4} style={{ color: '#1890ff', marginBottom: 16 }}>
                                     <StarOutlined /> Đánh giá sách
@@ -641,16 +584,9 @@ const BookDetailsPage: React.FC = () => {
                                     bordered={false} 
                                     style={{ 
                                         marginBottom: 24, 
-                                        background: theme === 'dark' ? '#141414' : '#f9f9f9',
                                         borderRadius: '8px',
-                                        boxShadow: theme === 'dark' ? '0 4px 12px rgba(0, 0, 0, 0.5)' : '0 4px 12px rgba(0, 0, 0, 0.1)'
                                     }}
-                                    styles={{
-                                        body: {
-                                            backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff',
-                                            color: theme === 'dark' ? '#ffffff' : '#000000'
-                                        }
-                                    }}>
+                                    >
                                     {user ? (
                                         <Form
                                             form={form}
@@ -676,11 +612,6 @@ const BookDetailsPage: React.FC = () => {
                                                 <Input.TextArea
                                                     rows={4}
                                                     placeholder="Chia sẻ cảm nghĩ của bạn về cuốn sách này..."
-                                                    style={{
-                                                        backgroundColor: theme === 'dark' ? '#141414' : '#ffffff',
-                                                        color: theme === 'dark' ? '#ffffff' : '#000000',
-                                                        borderColor: theme === 'dark' ? '#303030' : '#d9d9d9',
-                                                    }}
                                                 />
                                             </Form.Item>
                                             <Form.Item>
@@ -697,7 +628,7 @@ const BookDetailsPage: React.FC = () => {
                                     ) : (
                                         <div style={{ textAlign: 'center', padding: '24px' }}>
                                             <Space direction="vertical" size="middle" align="center">
-                                                <Text style={{ color: theme === 'dark' ? '#ffffff' : 'inherit' }}>
+                                                <Text>
                                                     Bạn cần đăng nhập để đánh giá sách
                                                 </Text>
                                                 <Button 
@@ -717,7 +648,6 @@ const BookDetailsPage: React.FC = () => {
                                     itemLayout="horizontal"
                                     dataSource={reviews}
                                     style={{
-                                        backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff',
                                         padding: '16px',
                                         borderRadius: '8px'
                                     }}
@@ -726,16 +656,13 @@ const BookDetailsPage: React.FC = () => {
                                             <div style={{ 
                                                 textAlign: 'center', 
                                                 padding: '32px 0',
-                                                backgroundColor: theme === 'dark' ? '#141414' : '#f9f9f9',
                                                 borderRadius: '8px'
                                             }}>
                                                 <StarOutlined style={{ 
                                                     fontSize: 32, 
-                                                    color: theme === 'dark' ? '#1f1f1f' : '#bfbfbf' 
                                                 }} />
                                                 <p style={{ 
                                                     marginTop: 12, 
-                                                    color: theme === 'dark' ? 'rgba(255, 255, 255, 0.65)' : '#8c8c8c',
                                                     fontSize: '16px'
                                                 }}>
                                                     Chưa có đánh giá nào cho cuốn sách này
@@ -750,7 +677,7 @@ const BookDetailsPage: React.FC = () => {
                                                     <Avatar 
                                                         icon={<UserOutlined />} 
                                                         style={{
-                                                            backgroundColor: theme === 'dark' ? '#1890ff' : '#1890ff',
+                                                            backgroundColor: '#1890ff',
                                                             color: '#ffffff'
                                                         }}
                                                     />
@@ -758,7 +685,6 @@ const BookDetailsPage: React.FC = () => {
                                                 title={
                                                     <Space align="center">
                                                         <span style={{ 
-                                                            color: theme === 'dark' ? '#ffffff' : 'inherit',
                                                             fontWeight: 500
                                                         }}>
                                                             {review.username || 'Ẩn danh'}
@@ -772,19 +698,16 @@ const BookDetailsPage: React.FC = () => {
                                                 }
                                                 description={
                                                     <div style={{
-                                                        backgroundColor: theme === 'dark' ? '#141414' : '#f9f9f9',
                                                         padding: '12px',
                                                         borderRadius: '8px',
                                                         marginTop: '8px'
                                                     }}>
                                                         <p style={{ 
                                                             margin: '0 0 8px 0',
-                                                            color: theme === 'dark' ? '#ffffff' : 'inherit',
                                                             lineHeight: '1.6'
                                                         }}>{review.comment}</p>
                         
                                                         <Text style={{ 
-                                                            color: theme === 'dark' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(0, 0, 0, 0.45)',
                                                             fontSize: '12px'
                                                         }}>
                                                             {isClient ? new Date(review.review_date).toLocaleDateString('vi-VN') : ''}

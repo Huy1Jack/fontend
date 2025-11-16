@@ -30,8 +30,18 @@ import {
   edit_borrow_return,
 } from "@/app/sever/admin/route";
 import dayjs from "dayjs";
+// ▼▼▼ THÊM MỚI IMPORT PLUGIN ▼▼▼
+import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
+import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
+// ▲▲▲ THÊM MỚI IMPORT PLUGIN ▲▲▲
 import { getAuthCookie } from "@/app/sever/authcookie/route";
 import { useRouter } from 'next/navigation';
+
+// ▼▼▼ THÊM MỚI KÍCH HOẠT PLUGIN ▼▼▼
+dayjs.extend(isSameOrAfter);
+dayjs.extend(isSameOrBefore);
+// ▲▲▲ THÊM MỚI KÍCH HOẠT PLUGIN ▲▲▲
+
 const { Search } = Input;
 const { Option } = Select;
 
@@ -62,6 +72,11 @@ export default function AdminBorrowReturn() {
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+
+  // ▼▼▼ THÊM MỚI STATE LỌC NGÀY ▼▼▼
+  const [filterDateRange, setFilterDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);
+  // ▲▲▲ THÊM MỚI STATE LỌC NGÀY ▲▲▲
+
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingRecord, setEditingRecord] = useState<BorrowReturn | null>(null);
   const [currentUser, setCurrentUser] = useState<string>("Không xác định");
@@ -214,7 +229,22 @@ export default function AdminBorrowReturn() {
       item.status.toLowerCase().includes(s) ||
       (item.last_updated_by?.toLowerCase() || "").includes(s);
     const matchesStatus = filterStatus === "all" || item.status === filterStatus;
-    return matchesSearch && matchesStatus;
+
+    // ▼▼▼ CẬP NHẬT LOGIC LỌC NGÀY ▼▼▼
+    let matchesDate = true; // Mặc định là true nếu không chọn ngày
+    if (filterDateRange && filterDateRange[0] && filterDateRange[1]) {
+      const itemDate = dayjs(item.borrow_date);
+      const startDate = filterDateRange[0];
+      const endDate = filterDateRange[1];
+      
+      // Kiểm tra xem 'itemDate' có nằm trong khoảng 'startDate' và 'endDate' (bao gồm cả 2 ngày)
+      matchesDate =
+        itemDate.isSameOrAfter(startDate, "day") &&
+        itemDate.isSameOrBefore(endDate, "day");
+    }
+    // ▲▲▲ CẬP NHẬT LOGIC LỌC NGÀY ▲▲▲
+
+    return matchesSearch && matchesStatus && matchesDate;
   });
 
   // ✅ Cột hiển thị bảng
@@ -319,6 +349,17 @@ export default function AdminBorrowReturn() {
             <Option value="Đã trả">Đã trả</Option>
             <Option value="Quá hạn">Quá hạn</Option>
           </Select>
+
+          {/* ▼▼▼ THÊM MỚI BỘ LỌC NGÀY ▼▼▼ */}
+          <DatePicker.RangePicker
+            placeholder={["Từ ngày mượn", "Đến ngày mượn"]}
+            onChange={(dates) => {
+              setFilterDateRange(dates);
+            }}
+            format="DD/MM/YYYY"
+          />
+          {/* ▲▲▲ THÊM MỚI BỘ LỌC NGÀY ▲▲▲ */}
+
         </Space>
       </Space>
 
