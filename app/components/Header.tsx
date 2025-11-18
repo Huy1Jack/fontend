@@ -82,7 +82,7 @@ const Header: React.FC = () => {
                 {/* Navbar */}
                 <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">
                     <Link href="/" className={navLinkClasses('/')}>Trang Chủ</Link>
-                    <Link href="/books" className={navLinkClasses('/books')}>Tra cứu sách</Link>
+                    <Link href="/books" className={navLinkClasses('/books')}>Sách</Link>
 
                     <Link href="/about" className={navLinkClasses('/about')}>Giới Thiệu</Link>
                     {(user?.role === UserRole.LIBRARIAN || user?.role === UserRole.ADMIN) && (

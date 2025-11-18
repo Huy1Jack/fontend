@@ -69,7 +69,7 @@ const resolveImageSrc = (imagePath: string | null | undefined): string => {
     if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) return imagePath
     if (imagePath.startsWith('data:')) return imagePath
     if (imagePath.startsWith('/')) return imagePath
-    return `/${imagePath.replace(/^\/+/, '')}`
+    return `/api/get_file?file=${imagePath}`
 }
 
 export default function AdminPage() {

@@ -2,19 +2,44 @@
 
 import React, { useState, useEffect } from 'react'
 import { Book } from '../../lib/types'
-import { Input } from '../components/ui/Input'
-import { Select } from '../components/ui/Select'
-import { Button } from '../components/ui/Button'
-import { Search, Filter, RefreshCw } from 'lucide-react'
-import { show_books, show_book_search } from "@/app/sever/route"
+import { show_books, show_book_search, add_book_review, edit_book_admin } from "@/app/sever/route"
 import Image from 'next/image'
 import Link from 'next/link'
-import { Card, CardContent } from '../components/ui/Card'
-import { add_book_review } from '@/app/sever/route'
 import Head from 'next/head'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { Modal, Rate, Form, Input as AntInput } from 'antd'
 import { useSearchParams } from 'next/navigation'
+
+// ==============================
+// 🎨 Import Ant Design
+// ==============================
+import {
+  Row,
+  Col,
+  Card,
+  Input,
+  Select,
+  Button,
+  Spin,
+  Result,
+  Typography,
+  Tag,
+  Empty,
+  Space,
+  Modal,
+  Rate,
+  Form,
+  Input as AntInput
+} from 'antd'
+import {
+  SearchOutlined,
+  FilterOutlined,
+  RedoOutlined,
+  LoadingOutlined
+} from '@ant-design/icons'
+
+const { Title, Text, Paragraph } = Typography
+const { Option } = Select
+const { Meta } = Card
 
 interface FilterOptions {
   author: string
@@ -41,17 +66,16 @@ const BooksPage: React.FC = () => {
   })
   const searchParams = useSearchParams()
   const searchQuery = searchParams.get('search') || ''
-
   // ==============================
   // 🧩 Xử lý hình ảnh sách
   // ==============================
   const resolveImageSrc = (book: Book): string => {
-    const raw = (book.coverUrl as string) || (book.image as string) || '/logo/logo.svg'
+    const raw = book.coverUrl || '/logo/logo.svg'
     if (!raw || typeof raw !== 'string') return '/logo/logo.svg'
     if (raw.startsWith('http://') || raw.startsWith('https://')) return raw
     if (raw.startsWith('data:')) return raw
     if (raw.startsWith('/')) return raw
-    return `/${raw.replace(/^\/+/, '')}`
+    return `/api/get_file?file=${raw}`
   }
 
   // ==============================
@@ -74,7 +98,8 @@ const BooksPage: React.FC = () => {
           description: b.Description ?? '',
           coverUrl: b.image ?? '/logo/logo.svg',
           DocumentType: b.DocumentType ?? '',
-          books_id: b.books_id
+          books_id: b.books_id,
+          file: b.file
         }))
         setBooks(list)
         setFilteredBooks(list)
@@ -95,7 +120,6 @@ const BooksPage: React.FC = () => {
   const filterBooks = () => {
     let filtered = [...books]
     
-    // Tìm kiếm theo tên sách
     if (filters.search) {
       filtered = filtered.filter(book =>
         (book.title || '').toLowerCase().includes(filters.search.toLowerCase()) ||
@@ -103,21 +127,18 @@ const BooksPage: React.FC = () => {
       )
     }
     
-    // Lọc theo tác giả
     if (filters.author) {
       filtered = filtered.filter(book =>
         (book.author || '').toLowerCase() === filters.author.toLowerCase()
       )
     }
     
-    // Lọc theo thể loại (category)
     if (filters.category) {
       filtered = filtered.filter(book =>
         (book.category || '').toLowerCase() === filters.category.toLowerCase()
       )
     }
     
-    // Lọc theo loại tài liệu (DocumentType)
     if (filters.documentType) {
       filtered = filtered.filter(book =>
         (book.DocumentType || '').toLowerCase() === filters.documentType.toLowerCase()
@@ -136,18 +157,19 @@ const BooksPage: React.FC = () => {
       setLoading(true)
       try {
         if (searchQuery.trim()) {
-          // ✅ Gọi API show_book_search()
           const res = await show_book_search(searchQuery)
           if (res.success && Array.isArray(res.books)) {
-            // ✅ Chuẩn hóa dữ liệu giống format show_books()
             const list: Book[] = res.books.map((b: any) => ({
               id: String(b.books_id ?? crypto.randomUUID()),
               title: b.Title ?? '',
               author: b.Author ?? '',
+              publisher: b.Publisher ?? '',
+              publishYear: b.PublishYear ?? 0,
               category: b.Category ?? '',
               coverUrl: b.image ?? '/logo/logo.svg',
               DocumentType: b.DocumentType ?? '',
-              books_id: b.books_id
+              books_id: b.books_id,
+              file: b.file
             }))
             setBooks(list)
             setFilteredBooks(list)
@@ -185,146 +207,193 @@ const BooksPage: React.FC = () => {
   }
 
   // ==============================
-  // ⏳ Loading UI
+  // ⏳ Loading UI (Đã sửa Dark Mode)
   // ==============================
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="flex items-center space-x-2">
-          <RefreshCw className="w-6 h-6 animate-spin text-primary" />
-          <span className="text-lg text-gray-700 dark:text-gray-300">Đang tải danh sách sách...</span>
-        </div>
+      // Đã bỏ 'background: #f0f2f5'
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+        <Spin indicator={<LoadingOutlined style={{ fontSize: 32 }} spin />} />
+        <Text style={{ marginLeft: 16, fontSize: 18 }}>Đang tải danh sách sách...</Text>
       </div>
     )
   }
 
   // ==============================
-  // ❌ Error UI
+  // ❌ Error UI (Đã sửa Dark Mode)
   // ==============================
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="bg-white dark:bg-gray-800 border border-red-400 rounded-lg p-6 text-center">
-          <h2 className="text-xl font-semibold text-red-600 mb-2">Lỗi tải dữ liệu</h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-4">{error}</p>
-          <Button onClick={fetchBooks} className="bg-red-600 hover:bg-red-700 text-white">
-            <RefreshCw className="w-4 h-4 mr-2" /> Thử lại
-          </Button>
-        </div>
+      // Đã bỏ 'background: #f0f2f5'
+      <div style={{ minHeight: '100vh', paddingTop: 48 }}>
+        <Result
+          status="error"
+          title="Lỗi tải dữ liệu"
+          subTitle={error}
+          extra={
+            <Button type="primary" onClick={fetchBooks} icon={<RedoOutlined />}>
+              Thử lại
+            </Button>
+          }
+        />
       </div>
     )
   }
 
+  // Lấy danh sách duy nhất cho bộ lọc
+  const authors = Array.from(new Set(books.map(b => b.author).filter(Boolean))).sort()
+  const categories = Array.from(new Set(books.map(b => b.category).filter(Boolean))).sort()
+  const documentTypes = Array.from(new Set(books.map(b => b.DocumentType || '').filter(Boolean))).sort()
+
   // ==============================
-  // 🖼️ Giao diện chính
+  // 🖼️ Giao diện chính (Đã sửa Dark Mode)
   // ==============================
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    // Đã bỏ 'background: #f0f2f5'
+    <div style={{ minHeight: '100vh' }}>
       <Head>
         <title>Thư viện Sách | Khám phá và Tìm kiếm</title>
       </Head>
 
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Thư viện Sách</h1>
-        <p className="text-gray-600 dark:text-gray-400 mb-6">Khám phá và tìm kiếm hàng trăm đầu sách.</p>
+      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px' }}>
+        <Title level={2}>Thư viện Sách</Title>
+        <Paragraph type="secondary" style={{ marginBottom: 24 }}>Khám phá và tìm kiếm hàng trăm đầu sách.</Paragraph>
 
         {/* Bộ lọc */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-8">
-          <div className="flex items-center mb-4">
-            <Filter className="w-5 h-5 text-primary mr-2" />
-            <h2 className="text-lg font-semibold">Bộ lọc tìm kiếm</h2>
-          </div>
+        <Card style={{ marginBottom: 24 }}>
+          <Space align="center" style={{ marginBottom: 16 }}>
+            <FilterOutlined style={{ color: '#1890ff' }} />
+            <Title level={4} style={{ margin: 0 }}>Bộ lọc tìm kiếm</Title>
+          </Space>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+          <Row gutter={[16, 16]} align="bottom">
             {/* Ô tìm kiếm tên sách */}
-            <div className="relative">
-              <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <Text strong>Tên sách</Text>
               <Input
-                type="text"
+                prefix={<SearchOutlined />}
                 placeholder="Tìm kiếm tên sách..."
                 value={filters.search}
                 onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-                className="pl-9"
+                allowClear
               />
-            </div>
+            </Col>
 
             {/* Bộ lọc tác giả */}
-            <Select
-              value={filters.author}
-              onChange={(e) => setFilters(prev => ({ ...prev, author: e.target.value }))}
-            >
-              <option value="">Tất cả tác giả</option>
-              {Array.from(new Set(books.map(b => b.author).filter(Boolean))).sort().map(author => (
-                <option key={author} value={author}>{author}</option>
-              ))}
-            </Select>
+            <Col xs={24} sm={12} md={8} lg={5}>
+              <Text strong>Tác giả</Text>
+              <Select
+                value={filters.author || ''}
+                onChange={(value) => setFilters(prev => ({ ...prev, author: value }))}
+                style={{ width: '100%' }}
+              >
+                <Option value="">Tất cả tác giả</Option>
+                {authors.map(author => (
+                  <Option key={author} value={author}>{author}</Option>
+                ))}
+              </Select>
+            </Col>
 
             {/* Bộ lọc thể loại (category) */}
-            <Select
-              value={filters.category}
-              onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
-            >
-              <option value="">Tất cả thể loại</option>
-              {Array.from(new Set(books.map(b => b.category).filter(Boolean))).sort().map(category => (
-                <option key={category} value={category}>{category}</option>
-              ))}
-            </Select>
+            <Col xs={24} sm={12} md={8} lg={5}>
+              <Text strong>Thể loại</Text>
+              <Select
+                value={filters.category || ''}
+                onChange={(value) => setFilters(prev => ({ ...prev, category: value }))}
+                style={{ width: '100%' }}
+              >
+                <Option value="">Tất cả thể loại</Option>
+                {categories.map(category => (
+                  <Option key={category} value={category}>{category}</Option>
+                ))}
+              </Select>
+            </Col>
 
             {/* Bộ lọc loại tài liệu (DocumentType) */}
-            <Select
-              value={filters.documentType}
-              onChange={(e) => setFilters(prev => ({ ...prev, documentType: e.target.value }))}
-            >
-              <option value="">Tất cả loại sách</option>
-              {Array.from(new Set(books.map(b => b.DocumentType || '').filter(Boolean))).sort().map(dt => (
-                <option key={dt} value={dt}>{dt}</option>
-              ))}
-            </Select>
+            <Col xs={24} sm={12} md={8} lg={5}>
+              <Text strong>Loại tài liệu</Text>
+              <Select
+                value={filters.documentType || ''}
+                onChange={(value) => setFilters(prev => ({ ...prev, documentType: value }))}
+                style={{ width: '100%' }}
+              >
+                <Option value="">Tất cả loại sách</Option>
+                {documentTypes.map(dt => (
+                  <Option key={dt} value={dt}>{dt}</Option>
+                ))}
+              </Select>
+            </Col>
+            
+            <Col xs={24} sm={12} md={8} lg={3}>
+              <Button onClick={resetFilters} icon={<RedoOutlined />} style={{ width: '100%' }}>
+                Xóa bộ lọc
+              </Button>
+            </Col>
+          </Row>
 
-            <Button onClick={resetFilters} variant="outline">
-              Xóa bộ lọc
-            </Button>
+          <div style={{ marginTop: 16 }}>
+            <Text type="secondary">
+              Hiển thị {filteredBooks.length} / {books.length} sách
+            </Text>
           </div>
-
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            Hiển thị {filteredBooks.length} / {books.length} sách
-          </div>
-        </div>
+        </Card>
 
         {/* Danh sách sách */}
         {filteredBooks.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Row gutter={[16, 24]}>
             {filteredBooks.map((book) => (
-              <Card key={book.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                <div className="relative bg-gray-100 dark:bg-gray-700 pb-[133%]">
-                  <Image
-                    src={resolveImageSrc(book)}
-                    alt={book.Title || book.title || 'Book cover'}
-                    fill
-                    className="object-cover"
+              <Col xs={24} sm={12} md={8} lg={6} key={book.id}>
+                <Card
+                  hoverable
+                  cover={
+                    // ✅ YÊU CẦU: Click vào ảnh để xem chi tiết
+                    <Link href={`/books/details?books_id=${book.books_id ?? book.id}`} >
+                      {/* Đã bỏ 'background: #f0f0f0' để sửa lỗi Dark Mode */}
+                      <div style={{ position: 'relative', height: 300 }}>
+                        <Image
+                          alt={book.Title || book.title || 'Book cover'}
+                          src={resolveImageSrc(book)}
+                          layout="fill"
+                          objectFit="cover"
+                        />
+                      </div>
+                    </Link>
+                  }
+                  actions={[
+                    // ✅ YÊU CẦU: Bỏ "Xem file", chỉ giữ "Xem chi tiết"
+                    <Link href={`/books/details?books_id=${book.books_id ?? book.id}`} key="details" >
+                      Xem chi tiết
+                    </Link>
+                  ]}
+                >
+                  <Meta
+                    title={
+                      <Link href={`/books/details?books_id=${book.books_id ?? book.id}`} style={{ color: 'inherit' }}>
+                        <Text style={{ fontSize: 16 }} strong ellipsis={{ tooltip: book.Title || book.title }}>
+                          {book.Title || book.title}
+                        </Text>
+                      </Link>
+                    }
+                    description={`Tác giả: ${book.author || '—'}`}
                   />
-                </div>
-                <CardContent className="p-4">
-                  <Link
-                    href={`/books/details?books_id=${book.books_id ?? book.id}`}
-                    className="block font-semibold text-gray-900 dark:text-white hover:text-blue-600 transition line-clamp-2"
-                  >
-                    {book.Title || book.title}
-                  </Link>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">
-                    Tác giả: {book.author || '—'}
-                  </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">
-                    Loại: {book.DocumentType || '—'}
-                  </p>
-                </CardContent>
-              </Card>
+                  <div style={{ marginTop: 12, minHeight: 80 }}>
+                    <Text type="secondary" style={{ display: 'block' }}>
+                      NXB: {book.publisher || '—'}
+                    </Text>
+                    <Text type="secondary" style={{ display: 'block' }}>
+                      Năm: {book.publishYear || '—'}
+                    </Text>
+                    <Space wrap size={[0, 8]} style={{ marginTop: 8 }}>
+                      {book.category && <Tag color="blue">{book.category}</Tag>}
+                      {book.DocumentType && <Tag color="green">{book.DocumentType}</Tag>}
+                    </Space>
+                  </div>
+                </Card>
+              </Col>
             ))}
-          </div>
+          </Row>
         ) : (
-          <div className="text-center py-12 text-gray-600 dark:text-gray-300">
-            Không tìm thấy sách phù hợp với tiêu chí tìm kiếm.
-          </div>
+          <Empty description="Không tìm thấy sách phù hợp với tiêu chí tìm kiếm." />
         )}
       </div>
     </div>

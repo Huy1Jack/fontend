@@ -10,11 +10,16 @@ import {
   Modal,
   message,
   Form,
+  Upload,
+  Tag,
+  Row,
+  Col,
 } from "antd";
 import {
   EditOutlined,
   DeleteOutlined,
   PlusOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import {
   get_book_admin,
@@ -39,6 +44,7 @@ interface Book {
   PublishYear: number;
   DocumentType: string;
   image: string;
+  document: string;
   IsPublic: number;
   UploadDate: string;
   UploadedBy: string;
@@ -46,7 +52,7 @@ interface Book {
   category_name: string;
   publisher_id: number;
   publisher_name: string;
-  author_ids: number[];
+  author_ids: number[]; // Quan trọng: Logic lọc tác giả dựa vào trường này
   authors: string;
 }
 
@@ -56,7 +62,11 @@ export default function AdminBooks() {
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
   const [filterLanguage, setFilterLanguage] = useState("all");
-  const [filterDocType, setFilterDocType] = useState("all");
+  
+  // === THAY ĐỔI STATE BỘ LỌC ===
+  const [filterCategory, setFilterCategory] = useState<number | "all">("all");
+  const [filterAuthor, setFilterAuthor] = useState<number | "all">("all");
+  // Đã bỏ filterDocType
 
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [editingBook, setEditingBook] = useState<Book | null>(null);
@@ -73,6 +83,7 @@ export default function AdminBooks() {
     category_id: null,
     author_ids: [],
     image: "",
+    document: "",
     IsPublic: 1,
   });
 
@@ -175,11 +186,9 @@ export default function AdminBooks() {
         return;
       }
 
-      const response = await add_book_admin({
-        token: token,
-        api_key: process.env.NEXT_PUBLIC_API_KEY,
-        datauser: newBook,
-      });
+      console.log(newBook);
+
+      const response = await add_book_admin(newBook);
 
       if (response.success) {
         message.success("Thêm sách thành công!");
@@ -195,6 +204,7 @@ export default function AdminBooks() {
           category_id: null,
           author_ids: [],
           image: "",
+          document: "",
           IsPublic: 1,
         });
         fetchBooks();
@@ -208,7 +218,10 @@ export default function AdminBooks() {
   };
 
   const handleEdit = (record: Book) => {
-    const selectedAuthorIds = authors
+    // Logic này giả định record.authors (string) là nguồn chính
+    // Nhưng để nhất quán, chúng ta nên dùng record.author_ids (number[]) nếu có
+    // Nếu API trả về author_ids, dùng trực tiếp
+    const selectedAuthorIds = record.author_ids || authors
       .filter((a) => record.authors?.includes(a.author_name))
       .map((a) => a.author_id);
 
@@ -226,11 +239,7 @@ export default function AdminBooks() {
       onOk: async () => {
         try {
           const token = await getAuthCookie();
-          const response = await del_book_admin({
-            token: token,
-            api_key: process.env.NEXT_PUBLIC_API_KEY,
-            datauser: { books_id: record.books_id },
-          });
+          const response = await del_book_admin({ books_id: record.books_id });
           if (response.success) {
             message.success(`Đã xóa sách: ${record.Title}`);
             fetchBooks();
@@ -261,6 +270,7 @@ export default function AdminBooks() {
         category_id: editingBook.category_id,
         author_ids: editingBook.author_ids,
         image: editingBook.image,
+        document: editingBook.document,
         IsPublic: editingBook.IsPublic,
       };
 
@@ -288,7 +298,7 @@ export default function AdminBooks() {
   // ================================
 
   const languages = Array.from(new Set(books.map((b) => b.Language)));
-  const documentTypes = Array.from(new Set(books.map((b) => b.DocumentType)));
+  // Đã bỏ documentTypes
 
   const filteredBooks = books.filter((book) => {
     const search = searchText.toLowerCase();
@@ -302,9 +312,16 @@ export default function AdminBooks() {
 
     const matchesLang =
       filterLanguage === "all" || book.Language === filterLanguage;
-    const matchesDoc =
-      filterDocType === "all" || book.DocumentType === filterDocType;
-    return matchesSearch && matchesLang && matchesDoc;
+
+    // === CẬP NHẬT LOGIC LỌC ===
+    const matchesCategory =
+      filterCategory === "all" || book.category_id === filterCategory;
+    
+    const matchesAuthor =
+      filterAuthor === "all" || book.author_ids?.includes(filterAuthor as number);
+    // Đã bỏ matchesDoc
+
+    return matchesSearch && matchesLang && matchesCategory && matchesAuthor;
   });
 
   // ================================
@@ -318,7 +335,7 @@ export default function AdminBooks() {
       width: 100,
       render: (img: string) => (
         <img
-          src={img ? `/${img}` : "/books/default.jpg"}
+          src={img ? `/api/get_file?file=${img}` : "/books/default.jpg"}
           alt="Book cover"
           style={{
             width: 70,
@@ -334,14 +351,13 @@ export default function AdminBooks() {
       title: "Tên sách",
       dataIndex: "Title",
       key: "Title",
-      width: 200,
       sorter: (a: Book, b: Book) => a.Title.localeCompare(b.Title),
     },
     {
       title: "Tác giả",
       dataIndex: "authors",
       key: "authors",
-      width: 180,
+      width: 200,
       render: (authors: string) => (
         <div>{authors?.split(", ").map((a, i) => <div key={i}>{a}</div>)}</div>
       ),
@@ -350,25 +366,7 @@ export default function AdminBooks() {
       title: "Danh mục",
       dataIndex: "category_name",
       key: "category_name",
-      width: 150,
-    },
-    {
-      title: "Nhà xuất bản",
-      dataIndex: "publisher_name",
-      key: "publisher_name",
-      width: 150,
-    },
-    {
-      title: "Ngôn ngữ",
-      dataIndex: "Language",
-      key: "Language",
-      width: 100,
-    },
-    {
-      title: "Loại tài liệu",
-      dataIndex: "DocumentType",
-      key: "DocumentType",
-      width: 120,
+      width: 180,
     },
     {
       title: "Năm XB",
@@ -382,12 +380,11 @@ export default function AdminBooks() {
       dataIndex: "IsPublic",
       key: "IsPublic",
       width: 100,
-      render: (val: number) =>
-        val === 1 ? (
-          <span style={{ color: "green" }}>Public</span>
-        ) : (
-          <span style={{ color: "red" }}>Private</span>
-        ),
+      render: (val: number) => (
+        <Tag color={val === 1 ? "green" : "red"}>
+          {val === 1 ? "Public" : "Private"}
+        </Tag>
+      ),
     },
     {
       title: "Thao tác",
@@ -431,37 +428,52 @@ export default function AdminBooks() {
         </Button>
       }
     >
-      <Space style={{ marginBottom: 16 }}>
+      {/* === CẬP NHẬT KHU VỰC BỘ LỌC === */}
+      <Space style={{ marginBottom: 16 }} wrap>
         <Search
           placeholder="Tìm kiếm sách..."
           allowClear
           onChange={(e) => setSearchText(e.target.value)}
           style={{ width: 300 }}
         />
+        {/* LỌC THEO DANH MỤC */}
         <Select
-          value={filterLanguage}
-          onChange={(v) => setFilterLanguage(v)}
-          style={{ width: 180 }}
+          value={filterCategory}
+          onChange={(v) => setFilterCategory(v)}
+          style={{ width: 200 }}
+          placeholder="Lọc theo danh mục"
         >
-          <Option value="all">Tất cả ngôn ngữ</Option>
-          {languages.map((lang) => (
-            <Option key={lang} value={lang}>
-              {lang}
+          <Option value="all">Tất cả danh mục</Option>
+          {categories.map((c) => (
+            <Option key={c.category_id} value={c.category_id}>
+              {c.category_name}
             </Option>
           ))}
         </Select>
+
+        {/* LỌC THEO TÁC GỈA */}
         <Select
-          value={filterDocType}
-          onChange={(v) => setFilterDocType(v)}
-          style={{ width: 180 }}
+          value={filterAuthor}
+          onChange={(v) => setFilterAuthor(v)}
+          style={{ width: 200 }}
+          placeholder="Lọc theo tác giả"
+          showSearch
+          optionFilterProp="children"
+          filterOption={(input, option) =>
+            (option?.children as unknown as string)
+              .toLowerCase()
+              .includes(input.toLowerCase())
+          }
         >
-          <Option value="all">Tất cả loại tài liệu</Option>
-          {documentTypes.map((type) => (
-            <Option key={type} value={type}>
-              {type}
+          <Option value="all">Tất cả tác giả</Option>
+          {authors.map((a) => (
+            <Option key={a.author_id} value={a.author_id}>
+              {a.author_name}
             </Option>
           ))}
         </Select>
+
+        {/* ĐÃ BỎ LỌC THEO LOẠI TÀI LIỆU */}
       </Space>
 
       <Table
@@ -470,7 +482,6 @@ export default function AdminBooks() {
         rowKey="books_id"
         loading={loading}
         pagination={{ pageSize: 10, showSizeChanger: true }}
-        scroll={{ x: 1300 }}
       />
 
       {/* MODAL CHỈNH SỬA */}
@@ -483,14 +494,28 @@ export default function AdminBooks() {
       >
         {editingBook && (
           <Form layout="vertical">
-            <Form.Item label="Tiêu đề">
-              <Input
-                value={editingBook.Title}
-                onChange={(e) =>
-                  setEditingBook({ ...editingBook, Title: e.target.value })
-                }
-              />
-            </Form.Item>
+            <Row gutter={16}>
+              <Col xs={24} md={12}>
+                <Form.Item label="Tiêu đề" required>
+                  <Input
+                    value={editingBook.Title}
+                    onChange={(e) =>
+                      setEditingBook({ ...editingBook, Title: e.target.value })
+                    }
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item label="ISBN">
+                  <Input
+                    value={editingBook.ISBN}
+                    onChange={(e) =>
+                      setEditingBook({ ...editingBook, ISBN: e.target.value })
+                    }
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
 
             <Form.Item label="Mô tả">
               <Input.TextArea
@@ -505,95 +530,178 @@ export default function AdminBooks() {
               />
             </Form.Item>
 
-            <Form.Item label="ISBN">
-              <Input
-                value={editingBook.ISBN}
-                onChange={(e) =>
-                  setEditingBook({ ...editingBook, ISBN: e.target.value })
-                }
-              />
-            </Form.Item>
+            <Row gutter={16}>
+              <Col xs={24} md={12}>
+                <Form.Item label="Tác giả" required>
+                  <Select
+                    mode="multiple"
+                    value={editingBook.author_ids}
+                    onChange={(vals) =>
+                      setEditingBook({ ...editingBook, author_ids: vals })
+                    }
+                    placeholder="Chọn tác giả"
+                  >
+                    {authors.map((a) => (
+                      <Option key={a.author_id} value={a.author_id}>
+                        {a.author_name}
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item label="Danh mục">
+                  <Select
+                    value={editingBook.category_id}
+                    onChange={(v) =>
+                      setEditingBook({ ...editingBook, category_id: v })
+                    }
+                  >
+                    {categories.map((c) => (
+                      <Option key={c.category_id} value={c.category_id}>
+                        {c.category_name}
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+            </Row>
 
-            <Form.Item label="Năm xuất bản">
-              <Input
-                type="number"
-                value={editingBook.PublishYear}
-                onChange={(e) =>
-                  setEditingBook({
-                    ...editingBook,
-                    PublishYear: parseInt(e.target.value),
-                  })
-                }
-              />
-            </Form.Item>
+            <Row gutter={16}>
+              <Col xs={24} md={12}>
+                <Form.Item label="Nhà xuất bản">
+                  <Select
+                    value={editingBook.publisher_id}
+                    onChange={(v) =>
+                      setEditingBook({ ...editingBook, publisher_id: v })
+                    }
+                  >
+                    {publishers.map((p) => (
+                      <Option key={p.publisher_id} value={p.publisher_id}>
+                        {p.publisher_name}
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item label="Năm xuất bản">
+                  <Input
+                    type="number"
+                    value={editingBook.PublishYear}
+                    onChange={(e) =>
+                      setEditingBook({
+                        ...editingBook,
+                        PublishYear: parseInt(e.target.value),
+                      })
+                    }
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
 
-            <Form.Item label="Ngôn ngữ">
-              <Input
-                value={editingBook.Language}
-                onChange={(e) =>
-                  setEditingBook({ ...editingBook, Language: e.target.value })
-                }
-              />
-            </Form.Item>
+            <Row gutter={16}>
+              <Col xs={24} md={12}>
+                <Form.Item label="Ngôn ngữ">
+                  <Input
+                    value={editingBook.Language}
+                    onChange={(e) =>
+                      setEditingBook({
+                        ...editingBook,
+                        Language: e.target.value,
+                      })
+                    }
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item label="Loại tài liệu">
+                  <Input
+                    value={editingBook.DocumentType}
+                    onChange={(e) =>
+                      setEditingBook({
+                        ...editingBook,
+                        DocumentType: e.target.value,
+                      })
+                    }
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
 
-            <Form.Item label="Loại tài liệu">
-              <Input
-                value={editingBook.DocumentType}
-                onChange={(e) =>
-                  setEditingBook({
-                    ...editingBook,
-                    DocumentType: e.target.value,
-                  })
-                }
-              />
-            </Form.Item>
-
-            <Form.Item label="Danh mục">
-              <Select
-                value={editingBook.category_id}
-                onChange={(v) =>
-                  setEditingBook({ ...editingBook, category_id: v })
-                }
-              >
-                {categories.map((c) => (
-                  <Option key={c.category_id} value={c.category_id}>
-                    {c.category_name}
-                  </Option>
-                ))}
-              </Select>
-            </Form.Item>
-
-            <Form.Item label="Nhà xuất bản">
-              <Select
-                value={editingBook.publisher_id}
-                onChange={(v) =>
-                  setEditingBook({ ...editingBook, publisher_id: v })
-                }
-              >
-                {publishers.map((p) => (
-                  <Option key={p.publisher_id} value={p.publisher_id}>
-                    {p.publisher_name}
-                  </Option>
-                ))}
-              </Select>
-            </Form.Item>
-
-            <Form.Item label="Tác giả">
-              <Select
-                mode="multiple"
-                value={editingBook.author_ids}
-                onChange={(vals) =>
-                  setEditingBook({ ...editingBook, author_ids: vals })
-                }
-                placeholder="Chọn tác giả"
-              >
-                {authors.map((a) => (
-                  <Option key={a.author_id} value={a.author_id}>
-                    {a.author_name}
-                  </Option>
-                ))}
-              </Select>
-            </Form.Item>
+            <Row gutter={16}>
+              <Col xs={24} md={12}>
+                <Form.Item label="Ảnh bìa">
+                  <Upload
+                    name="file"
+                    listType="picture-card"
+                    className="avatar-uploader"
+                    showUploadList={false}
+                    action="/api/upload_file"
+                    data={{ tieuChuan: "book", tieuChi: "image" }}
+                    onChange={(info) => {
+                      if (info.file.status === "done") {
+                        setEditingBook({
+                          ...editingBook,
+                          image: info.file.response.filepath,
+                        });
+                        message.success("Upload ảnh thành công");
+                      } else if (info.file.status === "error") {
+                        message.error("Upload ảnh thất bại");
+                      }
+                    }}
+                  >
+                    {editingBook.image ? (
+                      <img
+                        src={`/api/get_file?file=${editingBook.image}`}
+                        alt="avatar"
+                        style={{ width: "100%" }}
+                      />
+                    ) : (
+                      <div>
+                        <UploadOutlined />
+                        <div style={{ marginTop: 8 }}>Upload</div>
+                      </div>
+                    )}
+                  </Upload>
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item label="Tài liệu sách (PDF)">
+                  <Upload
+                    name="file"
+                    listType="picture-card"
+                    className="document-uploader"
+                    showUploadList={false}
+                    action="/api/upload_file"
+                    data={{ tieuChuan: "book", tieuChi: "document" }}
+                    onChange={(info) => {
+                      if (info.file.status === "done") {
+                        setEditingBook({
+                          ...editingBook,
+                          document: info.file.response.filepath,
+                        });
+                        message.success("Upload tài liệu thành công");
+                      } else if (info.file.status === "error") {
+                        message.error("Upload tài liệu thất bại");
+                      }
+                    }}
+                  >
+                    {editingBook.document ? (
+                      <div>
+                        <UploadOutlined />
+                        <div style={{ marginTop: 8 }}>PDF đã upload</div>
+                      </div>
+                    ) : (
+                      <div>
+                        <UploadOutlined />
+                        <div style={{ marginTop: 8 }}>Upload PDF</div>
+                      </div>
+                    )}
+                  </Upload>
+                </Form.Item>
+              </Col>
+            </Row>
 
             <Form.Item label="Trạng thái">
               <Select
@@ -619,12 +727,28 @@ export default function AdminBooks() {
         width={800}
       >
         <Form layout="vertical">
-          <Form.Item label="Tiêu đề">
-            <Input
-              value={newBook.Title}
-              onChange={(e) => setNewBook({ ...newBook, Title: e.target.value })}
-            />
-          </Form.Item>
+          <Row gutter={16}>
+            <Col xs={24} md={12}>
+              <Form.Item label="Tiêu đề" required>
+                <Input
+                  value={newBook.Title}
+                  onChange={(e) =>
+                    setNewBook({ ...newBook, Title: e.target.value })
+                  }
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item label="ISBN">
+                <Input
+                  value={newBook.ISBN}
+                  onChange={(e) =>
+                    setNewBook({ ...newBook, ISBN: e.target.value })
+                  }
+                />
+              </Form.Item>
+            </Col>
+          </Row>
 
           <Form.Item label="Mô tả">
             <Input.TextArea
@@ -636,92 +760,172 @@ export default function AdminBooks() {
             />
           </Form.Item>
 
-          <Form.Item label="ISBN">
-            <Input
-              value={newBook.ISBN}
-              onChange={(e) => setNewBook({ ...newBook, ISBN: e.target.value })}
-            />
-          </Form.Item>
+          <Row gutter={16}>
+            <Col xs={24} md={12}>
+              <Form.Item label="Tác giả" required>
+                <Select
+                  mode="multiple"
+                  value={newBook.author_ids}
+                  onChange={(vals) =>
+                    setNewBook({ ...newBook, author_ids: vals })
+                  }
+                  placeholder="Chọn tác giả"
+                >
+                  {authors.map((a) => (
+                    <Option key={a.author_id} value={a.author_id}>
+                      {a.author_name}
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item label="Danh mục">
+                <Select
+                  value={newBook.category_id}
+                  onChange={(v) => setNewBook({ ...newBook, category_id: v })}
+                  placeholder="Chọn danh mục"
+                >
+                  {categories.map((c) => (
+                    <Option key={c.category_id} value={c.category_id}>
+                      {c.category_name}
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
 
-          <Form.Item label="Năm xuất bản">
-            <Input
-              type="number"
-              value={newBook.PublishYear}
-              onChange={(e) =>
-                setNewBook({ ...newBook, PublishYear: parseInt(e.target.value) })
-              }
-            />
-          </Form.Item>
+          <Row gutter={16}>
+            <Col xs={24} md={12}>
+              <Form.Item label="Nhà xuất bản">
+                <Select
+                  value={newBook.publisher_id}
+                  onChange={(v) =>
+                    setNewBook({ ...newBook, publisher_id: v })
+                  }
+                  placeholder="Chọn nhà xuất bản"
+                >
+                  {publishers.map((p) => (
+                    <Option key={p.publisher_id} value={p.publisher_id}>
+                      {p.publisher_name}
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item label="Năm xuất bản">
+                <Input
+                  type="number"
+                  value={newBook.PublishYear}
+                  onChange={(e) =>
+                    setNewBook({
+                      ...newBook,
+                      PublishYear: parseInt(e.target.value),
+                    })
+                  }
+                />
+              </Form.Item>
+            </Col>
+          </Row>
 
-          <Form.Item label="Ngôn ngữ">
-            <Input
-              value={newBook.Language}
-              onChange={(e) =>
-                setNewBook({ ...newBook, Language: e.target.value })
-              }
-            />
-          </Form.Item>
+          <Row gutter={16}>
+            <Col xs={24} md={12}>
+              <Form.Item label="Ngôn ngữ">
+                <Input
+                  value={newBook.Language}
+                  onChange={(e) =>
+                    setNewBook({ ...newBook, Language: e.target.value })
+                  }
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item label="Loại tài liệu">
+                <Input
+                  value={newBook.DocumentType}
+                  onChange={(e) =>
+                    setNewBook({ ...newBook, DocumentType: e.target.value })
+                  }
+                />
+              </Form.Item>
+            </Col>
+          </Row>
 
-          <Form.Item label="Loại tài liệu">
-            <Input
-              value={newBook.DocumentType}
-              onChange={(e) =>
-                setNewBook({ ...newBook, DocumentType: e.target.value })
-              }
-            />
-          </Form.Item>
-
-          <Form.Item label="Danh mục">
-            <Select
-              value={newBook.category_id}
-              onChange={(v) => setNewBook({ ...newBook, category_id: v })}
-              placeholder="Chọn danh mục"
-            >
-              {categories.map((c) => (
-                <Option key={c.category_id} value={c.category_id}>
-                  {c.category_name}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          <Form.Item label="Nhà xuất bản">
-            <Select
-              value={newBook.publisher_id}
-              onChange={(v) => setNewBook({ ...newBook, publisher_id: v })}
-              placeholder="Chọn nhà xuất bản"
-            >
-              {publishers.map((p) => (
-                <Option key={p.publisher_id} value={p.publisher_id}>
-                  {p.publisher_name}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          <Form.Item label="Tác giả">
-            <Select
-              mode="multiple"
-              value={newBook.author_ids}
-              onChange={(vals) => setNewBook({ ...newBook, author_ids: vals })}
-              placeholder="Chọn tác giả"
-            >
-              {authors.map((a) => (
-                <Option key={a.author_id} value={a.author_id}>
-                  {a.author_name}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          <Form.Item label="Ảnh bìa (tên file)">
-            <Input
-              value={newBook.image}
-              onChange={(e) =>
-                setNewBook({ ...newBook, image: e.target.value })
-              }
-            />
-          </Form.Item>
+          <Row gutter={16}>
+            <Col xs={24} md={12}>
+              <Form.Item label="Ảnh bìa">
+                <Upload
+                  name="file"
+                  listType="picture-card"
+                  className="avatar-uploader"
+                  showUploadList={false}
+                  action="/api/upload_file"
+                  data={{ tieuChuan: "book", tieuChi: "image" }}
+                  onChange={(info) => {
+                    if (info.file.status === "done") {
+                      setNewBook(prevBook => ({
+                        ...prevBook,
+                        image: info.file.response.filepath,
+                      }));
+                      message.success("Upload ảnh thành công");
+                    } else if (info.file.status === "error") {
+                      message.error("Upload ảnh thất bại");
+                    }
+                  }}
+                >
+                  {newBook.image ? (
+                    <img
+                      src={`/api/get_file?file=${newBook.image}`}
+                      alt="avatar"
+                      style={{ width: "100%" }}
+                    />
+                  ) : (
+                    <div>
+                      <UploadOutlined />
+                      <div style={{ marginTop: 8 }}>Upload</div>
+                    </div>
+                  )}
+                </Upload>
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item label="Tài liệu sách (PDF)">
+                <Upload
+                  name="file"
+                  listType="picture-card"
+                  className="document-uploader"
+                  showUploadList={false}
+                  action="/api/upload_file"
+                  data={{ tieuChuan: "book", tieuChi: "document" }}
+                  onChange={(info) => {
+                    if (info.file.status === "done") {
+                      setNewBook({
+                        ...newBook,
+                        document: info.file.response.filepath,
+                      });
+                      message.success("Upload tài liệu thành công");
+                    } else if (info.file.status === "error") {
+                      message.error("Upload tài liệu thất bại");
+                    }
+                  }}
+                >
+                  {newBook.document ? (
+                    <div>
+                      <UploadOutlined />
+                      <div style={{ marginTop: 8 }}>PDF đã upload</div>
+                    </div>
+                  ) : (
+                    <div>
+                      <UploadOutlined />
+                      <div style={{ marginTop: 8 }}>Upload PDF</div>
+                    </div>
+                  )}
+                </Upload>
+              </Form.Item>
+            </Col>
+          </Row>
 
           <Form.Item label="Trạng thái">
             <Select

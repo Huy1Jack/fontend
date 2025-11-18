@@ -76,7 +76,7 @@ export async function add_book_admin(datauser): Promise<any> {
   const token = cookieStore.get("authToken")?.value || "Không có token";
   
   try {
-    const response = await callPythonAPI("add_book_admin1", { token, datauser, api_key: API_KEY });
+    const response = await callPythonAPI("add_book_adm", { token, datauser, api_key: API_KEY });
     console.log(response)
     return response;
   } catch (error) {

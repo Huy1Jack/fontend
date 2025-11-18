@@ -24,7 +24,7 @@ const resolveImageSrc = (imagePath: string | null | undefined): string => {
 export default function HomePage() {
     const [featuredBooks, setFeaturedBooks] = useState<Book[]>([])
     const [loading, setLoading] = useState(true)
-
+    
     useEffect(() => {
         const fetchFeaturedBooks = async () => {
             try {
@@ -53,13 +53,18 @@ export default function HomePage() {
                             category: b.Category ?? '',
                             description: b.Description ?? '',
                             coverUrl: resolveImageSrc(b.image),
-                            totalCopies: 0,
-                            availableCopies: 0,
+                            totalCopies: b.total_copies ?? 0,
+                            availableCopies: b.total_copies ?? 0,
                             rating: 0,
                             reviews: 0,
                             tags: [],
+                            // Additional fields from API
+                            Category: b.Category ?? '',
+                            status: b.status ?? '',
+                            total_copies: b.total_copies ?? 0,
+                            view_count: b.view_count ?? 0,
                             // Legacy fields
-                            books_id: b.books_id,
+                            books_id: b.books_id ?? 0,
                             Title: b.Title,
                             Author: b.Author,
                             Publisher: b.Publisher,

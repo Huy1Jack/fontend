@@ -1,5 +1,5 @@
 export interface Book {
-    id: string
+    id: number
     title: string
     author: string
     publisher: string
@@ -13,9 +13,14 @@ export interface Book {
     rating: number
     reviews: number
     tags: string[]
+    // Additional fields from API
+    Category: string
+    status: string
+    total_copies: number
+    view_count: number
     // Legacy fields for backward compatibility
-    books_id?: number
-    Title?: string
+    books_id: number
+    Title: string
     Author?: string
     Publisher?: string
     DocumentType?: string
@@ -27,6 +32,7 @@ export interface Book {
     UploadDate?: string
     UploadedBy?: string
     image?: string | null
+    file?: string | null
 }
 
 export interface BorrowedBook extends Book {

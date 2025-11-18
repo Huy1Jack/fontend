@@ -264,6 +264,46 @@ export async function show_book_search(keyword: string): Promise<any> {
   }
 }
 
+export async function edit_book_admin(datauser: any): Promise<any> {
+  const cookieStore = cookies();
+  const token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
+
+  try {
+    const response = await callPythonAPI("edit_book_admin", {
+      api_key: API_KEY,
+      token: token,
+      datauser: datauser,
+    });
+    return response;
+  } catch (error: any) {
+    console.error("Error calling edit_book_admin:", error);
+    return {
+      success: false,
+      message: error.message || "Error calling edit_book_admin API.",
+    };
+  }
+}
+
+
+export async function view_count(datauser: any): Promise<any> {
+  const cookieStore = cookies();
+  const token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
+
+  try {
+    const response = await callPythonAPI("view_count", {
+      api_key: API_KEY,
+      token: token,
+      datauser: datauser,
+    });
+    return response;
+  } catch (error: any) {
+    console.error("Error calling view_count:", error);
+    return {
+      success: false,
+      message: error.message || "Error calling view_count API.",
+    };
+  }
+}
 // export async function check_str(): Promise<any> {
 //   try {
 //     const response = { "server": "Ziang - 2025", "domain": "ziii.me", "y": "2025" };
