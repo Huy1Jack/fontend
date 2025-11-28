@@ -4,9 +4,15 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+<<<<<<< HEAD
     "build": "next build",
     "start": "cross-env HOST=0.0.0.0 PORT=4036 next start",
+=======
+    "build": "cross-env NEXT_WORKER_THREADS=1 NODE_OPTIONS=--max-old-space-size=4096 next build --debug",
+    "start": "next start",
+>>>>>>> 2ff951958a301ec8b5cbd2769a4eff8f8f34c4cc
     "lint": "next lint"
+
   },
   "dependencies": {
     "@google/genai": "^1.21.0",
