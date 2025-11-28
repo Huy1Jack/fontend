@@ -4,19 +4,19 @@ import React, { useState, useEffect, useMemo, useRef } from 'react' // Thêm use
 import 'antd/dist/reset.css'
 import { Card, Descriptions, Typography, Row, Col, Tag, Space, Divider, Rate, Button, Image as AntImage, Modal, Form, Input, List, Avatar, message } from 'antd'
 import { BookOutlined, CalendarOutlined, FieldNumberOutlined, GlobalOutlined, HomeOutlined, TagsOutlined, DownloadOutlined, EyeOutlined, UserOutlined, StarOutlined, CommentOutlined, LoginOutlined } from '@ant-design/icons'
-import AuthModal from '@/app/components/AuthModal'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { useTheme } from '@/lib/context/ThemeContext'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { show_books, add_book_review, show_book_reviews, view_count } from '@/app/actions/generalActions'
 import { useSearchParams } from 'next/navigation'
-import { show_books, add_book_review, show_book_reviews, view_count } from '@/app/sever/route'
-
 import Head from 'next/head'
 
 const { Title, Paragraph, Text } = Typography
 
 const BookDetailsPage: React.FC = () => {
     const searchParams = useSearchParams()
+    const router = useRouter()
     const booksId = searchParams.get('books_id')
     const { theme } = useTheme()
 
@@ -31,17 +31,16 @@ const BookDetailsPage: React.FC = () => {
     const [reviews, setReviews] = React.useState<any[]>([])
     const [form] = Form.useForm()
     const [submitting, setSubmitting] = React.useState(false)
-    const [showAuthModal, setShowAuthModal] = React.useState(false)
     const { user } = useAuth()
 
     const ViewCount = async (bookId: number | undefined) => {
         if (!bookId) return;
         try {
-          view_count({ books_id: bookId });
+            view_count({ books_id: bookId });
         } catch (error) {
-          console.error('Lỗi không cập nhật được số lượt xem:', error);
+            console.error('Lỗi không cập nhật được số lượt xem:', error);
         }
-      };
+    };
 
     const fetchReviews = async () => {
         if (!booksId) return;
@@ -69,7 +68,7 @@ const BookDetailsPage: React.FC = () => {
     // ... (Giữ nguyên phần handleSubmitReview và resolveImageSrc) ...
     const handleSubmitReview = async (values: any) => {
         if (!user) {
-            setShowAuthModal(true);
+            router.push('/login')
             return;
         }
         if (!booksId) {
@@ -78,12 +77,12 @@ const BookDetailsPage: React.FC = () => {
         }
         try {
             setSubmitting(true);
-            const reviewData = { books_id: booksId, rating: values.rating, comment: values.comment };     
+            const reviewData = { books_id: booksId, rating: values.rating, comment: values.comment };
             const response = await add_book_review(reviewData);
             if (response.success) {
                 Modal.success({ title: 'Đánh giá thành công', content: 'Cảm ơn bạn đã đánh giá cuốn sách này!', okText: 'Đóng' });
                 form.resetFields();
-                fetchReviews(); 
+                fetchReviews();
             } else {
                 Modal.error({ title: 'Lỗi', content: response.message || 'Có lỗi xảy ra khi gửi đánh giá', okText: 'Đóng' });
             }
@@ -118,7 +117,7 @@ const BookDetailsPage: React.FC = () => {
 
         // Bắt đầu gọi API
         fetchReviews();
-        
+
         // Gọi hàm ViewCount (bạn định nghĩa ở trên nhưng chưa dùng, tôi thêm vào đây luôn nếu cần)
         // ViewCount(Number(booksId)); 
 
@@ -130,7 +129,7 @@ const BookDetailsPage: React.FC = () => {
                     const found = res.data.find((b: any) => String(b.books_id ?? b.id) === String(booksId))
                     setBook(found || null)
                     if (!found) setError('Không tìm thấy sách')
-                    
+
                     // Gọi ViewCount sau khi tìm thấy sách (nếu muốn đếm view khi load trang thành công)
                     if (found) {
                         ViewCount(found.books_id ?? found.id);
@@ -143,7 +142,7 @@ const BookDetailsPage: React.FC = () => {
             }
         }
         load()
-        
+
     }, [booksId]) // Dependency giữ nguyên
 
     // ... (Phần còn lại của component giữ nguyên) ...
@@ -154,7 +153,7 @@ const BookDetailsPage: React.FC = () => {
         try {
             const raw = localStorage.getItem('favoriteBooks')
             if (raw) setFavorites(new Set(JSON.parse(raw)))
-        } catch {}
+        } catch { }
     }, [])
 
     const isFav = (id: number | string | undefined) => {
@@ -170,7 +169,7 @@ const BookDetailsPage: React.FC = () => {
             const next = new Set(prev)
             if (next.has(num)) next.delete(num)
             else next.add(num)
-            try { localStorage.setItem('favoriteBooks', JSON.stringify(Array.from(next))) } catch {}
+            try { localStorage.setItem('favoriteBooks', JSON.stringify(Array.from(next))) } catch { }
             return next
         })
     }
@@ -194,9 +193,9 @@ const BookDetailsPage: React.FC = () => {
 
     // Return JSX... (Phần render giữ nguyên như file gốc của bạn)
     return (
-        <div style={{ 
-            padding: '16px 12px', 
-            maxWidth: 1400, 
+        <div style={{
+            padding: '16px 12px',
+            maxWidth: 1400,
             margin: '0 auto',
             zoom: 1,
             WebkitTransform: 'scale(1)',
@@ -239,7 +238,7 @@ const BookDetailsPage: React.FC = () => {
                     />
                 </Head>
             )}
-            
+
             {!booksId && (
                 <Card style={{ marginBottom: 16 }}>
                     <Text type="danger">Thiếu tham số books_id</Text>
@@ -282,11 +281,11 @@ const BookDetailsPage: React.FC = () => {
                                 <div>
                                     <Text strong style={{ fontSize: 16, marginBottom: 8, display: 'block' }}>Đánh giá</Text>
                                     <Space align="center" style={{ width: '100%', justifyContent: 'center' }}>
-                                    <Rate allowHalf value={averageRating} disabled style={{ fontSize: 16 }} />
+                                        <Rate allowHalf value={averageRating} disabled style={{ fontSize: 16 }} />
                                         <Text type="secondary">({reviewCount} đánh giá)</Text>
                                     </Space>
                                 </div>
-                                
+
                                 {tags.length > 0 && (
                                     <>
                                         <Divider style={{ margin: '12px 0' }} />
@@ -303,7 +302,7 @@ const BookDetailsPage: React.FC = () => {
                             </Space>
                         </Card>
                     </Col>
-                    
+
                     <Col xs={24} md={15} lg={15}>
                         <Space direction="vertical" size={16} style={{ width: '100%' }}>
                             <Card>
@@ -331,23 +330,23 @@ const BookDetailsPage: React.FC = () => {
                                 <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
                                     <Button onClick={() => toggleFav(book.books_id ?? book.id)} icon={<TagsOutlined />} style={{ height: '40px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 500, padding: '4px 16px' }}>{isFav(book.books_id ?? book.id) ? 'Đã thích' : 'Yêu thích'}</Button>
                                     <Button type="primary" icon={<EyeOutlined />} onClick={() => {
-                                            const pdfUrl = `/api/get_file?file=${book.file}`;
-                                            fetch(pdfUrl).then(response => {
-                                                    if (response.ok) { setPdfUrl(pdfUrl); setPreviewModalVisible(true); } else { throw new Error('PDF không tồn tại'); }
-                                                }).catch(() => { Modal.error({ title: 'Lỗi', content: 'Không thể xem trước sách này. File PDF không tồn tại.' }); });
-                                        }} style={{ height: '40px', flex: 1, margin: '0 4px', backgroundColor: '#52c41a' }}>Đọc Ngay</Button>
+                                        const pdfUrl = `/api/get_file?file=${book.file}`;
+                                        fetch(pdfUrl).then(response => {
+                                            if (response.ok) { setPdfUrl(pdfUrl); setPreviewModalVisible(true); } else { throw new Error('PDF không tồn tại'); }
+                                        }).catch(() => { Modal.error({ title: 'Lỗi', content: 'Không thể xem trước sách này. File PDF không tồn tại.' }); });
+                                    }} style={{ height: '40px', flex: 1, margin: '0 4px', backgroundColor: '#52c41a' }}>Đọc Ngay</Button>
                                     <Button icon={<DownloadOutlined />} onClick={() => {
-                                            const pdfUrl = `/api/get_file?file=${book.file}`;
-                                            fetch(pdfUrl).then(response => {
-                                                    if (response.ok) { return response.blob(); } throw new Error('PDF không tồn tại');
-                                                }).then(blob => {
-                                                    const url = window.URL.createObjectURL(blob);
-                                                    const link = document.createElement('a');
-                                                    link.href = url; link.download = `${book.Title || 'book'}.pdf`;
-                                                    document.body.appendChild(link); link.click();
-                                                    window.URL.revokeObjectURL(url); document.body.removeChild(link);
-                                                }).catch(() => { Modal.error({ title: 'Lỗi', content: 'Không thể tải xuống sách này. File PDF không tồn tại.' }); });
-                                        }} style={{ height: '40px', flex: 1, margin: '0 4px' }}>Tải về</Button>
+                                        const pdfUrl = `/api/get_file?file=${book.file}`;
+                                        fetch(pdfUrl).then(response => {
+                                            if (response.ok) { return response.blob(); } throw new Error('PDF không tồn tại');
+                                        }).then(blob => {
+                                            const url = window.URL.createObjectURL(blob);
+                                            const link = document.createElement('a');
+                                            link.href = url; link.download = `${book.Title || 'book'}.pdf`;
+                                            document.body.appendChild(link); link.click();
+                                            window.URL.revokeObjectURL(url); document.body.removeChild(link);
+                                        }).catch(() => { Modal.error({ title: 'Lỗi', content: 'Không thể tải xuống sách này. File PDF không tồn tại.' }); });
+                                    }} style={{ height: '40px', flex: 1, margin: '0 4px' }}>Tải về</Button>
                                 </div>
                             </Card>
 
@@ -364,8 +363,6 @@ const BookDetailsPage: React.FC = () => {
                                 )}
                             </Modal>
 
-                            {showAuthModal && (<AuthModal onClose={() => setShowAuthModal(false)} />)}
-
                             <Card>
                                 <Title level={4} style={{ color: '#1890ff', marginBottom: 16 }}><StarOutlined /> Đánh giá sách</Title>
                                 <Card bordered={false} style={{ marginBottom: 24, borderRadius: '8px' }}>
@@ -379,7 +376,7 @@ const BookDetailsPage: React.FC = () => {
                                         <div style={{ textAlign: 'center', padding: '24px' }}>
                                             <Space direction="vertical" size="middle" align="center">
                                                 <Text>Bạn cần đăng nhập để đánh giá sách</Text>
-                                                <Button type="primary" icon={<LoginOutlined />} onClick={() => setShowAuthModal(true)}>Đăng nhập ngay</Button>
+                                                <Button type="primary" icon={<LoginOutlined />} onClick={() => router.push('/login')}>Đăng nhập ngay</Button>
                                             </Space>
                                         </div>
                                     )}

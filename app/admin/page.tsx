@@ -2,21 +2,21 @@
 
 import React, { useState, useEffect } from 'react'
 import { Card, Table, Tag, Spin, Alert, Empty } from 'antd'
-import { 
-    BarChart, 
-    Bar, 
-    XAxis, 
-    YAxis, 
-    CartesianGrid, 
-    Tooltip, 
-    Legend, 
-    ResponsiveContainer 
+import {
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    Legend,
+    ResponsiveContainer
 } from 'recharts'
-import { 
-    BookOpen, 
-    Users, 
-    Calendar, 
-    Star, 
+import {
+    BookOpen,
+    Users,
+    Calendar,
+    Star,
     BarChart3,
     TrendingUp,
     RefreshCw,
@@ -25,8 +25,8 @@ import {
 } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import Image from 'next/image'
-import { get_book_admin, get_user, get_borrow_return } from '@/app/sever/admin/route'
-import { getAuthCookie } from "@/app/sever/authcookie/route";
+import { get_book_admin, get_user, get_borrow_return } from '@/app/actions/adminActions'
+import { getAuthCookie } from "@/app/actions/authActions";
 import { useRouter } from 'next/navigation';
 import { message } from 'antd';
 interface StatisticsData {
@@ -82,7 +82,7 @@ export default function AdminPage() {
         try {
             setLoading(true)
             setError(null)
-            
+
             // Gọi API get_statistics chính
             const statisticsResponse = await fetch('/api/get_statistics', {
                 method: 'POST',
@@ -91,18 +91,18 @@ export default function AdminPage() {
                 },
             })
             const statisticsData = await statisticsResponse.json()
-            
+
             // Khởi tạo giá trị mặc định
             let totalBooks = 0
             let totalUsers = 0
             let activeBorrowers = 0
-            
+
             // Gọi các API để đếm (xử lý lỗi riêng biệt)
             try {
                 const booksResponse = await get_book_admin()
                 if (booksResponse.success && Array.isArray(booksResponse.data)) {
                     // Lọc sách có IsPublic = 1
-                    totalBooks = booksResponse.data.filter((book: any) => 
+                    totalBooks = booksResponse.data.filter((book: any) =>
                         book.IsPublic === 1 || book.IsPublic === '1'
                     ).length
                 }
@@ -110,7 +110,7 @@ export default function AdminPage() {
                 console.error('Error fetching books:', err)
                 // Không set error, chỉ log
             }
-            
+
             try {
                 const usersResponse = await get_user()
                 if (usersResponse.success && Array.isArray(usersResponse.data)) {
@@ -120,12 +120,12 @@ export default function AdminPage() {
                 console.error('Error fetching users:', err)
                 // Không set error, chỉ log
             }
-            
+
             try {
                 const borrowResponse = await get_borrow_return()
                 if (borrowResponse.success && Array.isArray(borrowResponse.data)) {
                     // Lọc những bản ghi có status = 'Đang mượn' và return_date là null
-                    const activeBorrows = borrowResponse.data.filter((item: any) => 
+                    const activeBorrows = borrowResponse.data.filter((item: any) =>
                         item.status === 'Đang mượn' && (!item.return_date || item.return_date === null)
                     )
                     // Đếm số user_id khác nhau (ưu tiên user_id, nếu không có thì dùng user_name)
@@ -140,7 +140,7 @@ export default function AdminPage() {
                 console.error('Error fetching borrows:', err)
                 // Không set error, chỉ log
             }
-            
+
             if (statisticsData.success && statisticsData.data) {
                 // Cập nhật thống kê với dữ liệu từ các API
                 setStatistics({
@@ -167,24 +167,24 @@ export default function AdminPage() {
 
     const checkUser = async () => {
         try {
-          const token = await getAuthCookie();
-          if (!token) {
-            message.error("Bạn chưa đăng nhập");
-            router.push("/");
-            return;
-          }
-    
-          const payload = JSON.parse(atob(token.split(".")[1]));
-          if (![1, 2].includes(payload.role)) {
-            message.error("Bạn không có quyền truy cập trang này");
-            router.push("/");
-          }
+            const token = await getAuthCookie();
+            if (!token) {
+                message.error("Bạn chưa đăng nhập");
+                router.push("/");
+                return;
+            }
+
+            const payload = JSON.parse(atob(token.split(".")[1]));
+            if (![1, 2].includes(payload.role)) {
+                message.error("Bạn không có quyền truy cập trang này");
+                router.push("/");
+            }
         } catch (error) {
-          console.error("Error checking user:", error);
-          message.error("Máy chủ không phản hồi");
-          router.push("/");
+            console.error("Error checking user:", error);
+            message.error("Máy chủ không phản hồi");
+            router.push("/");
         }
-      };
+    };
     // Cấu hình cột cho bảng Top sách
     const topBooksColumns = [
         {
@@ -358,10 +358,10 @@ export default function AdminPage() {
     // Chuyển đổi dữ liệu cho biểu đồ
     const chartData = statistics?.monthly_borrow
         ? statistics.monthly_borrow.map((item) => ({
-              month: item.month,
-              'Mượn': item.total_borrow,
-              'Trả': item.total_return,
-          }))
+            month: item.month,
+            'Mượn': item.total_borrow,
+            'Trả': item.total_return,
+        }))
         : []
 
     if (loading) {
@@ -497,8 +497,8 @@ export default function AdminPage() {
                     <ResponsiveContainer width="100%" height={300}>
                         <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis 
-                                dataKey="month" 
+                            <XAxis
+                                dataKey="month"
                                 angle={-45}
                                 textAnchor="end"
                                 height={80}

@@ -2,9 +2,9 @@
 import { useEffect, useState } from 'react';
 import { Table, Space, Button, Input, Modal, message, Form } from 'antd';
 import { EditOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
-import { get_authors_and_categories, del_categories, edit_categories } from '@/app/sever/admin/route';
+import { get_authors_and_categories, del_categories, edit_categories } from '@/app/actions/adminActions';
 import type { ColumnsType } from 'antd/es/table';
-import { getAuthCookie } from '@/app/sever/authcookie/route';
+import { getAuthCookie } from '@/app/actions/authActions';
 import { useRouter } from 'next/navigation';
 
 interface Category {
@@ -33,12 +33,6 @@ export default function CategoriesPage() {
         router.push("/");
         return;
       }
-
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      if (![1, 2].includes(payload.role)) {
-        message.error("Bạn không có quyền truy cập trang này");
-        router.push("/");
-      }
     } catch (error) {
       console.error("Error checking user:", error);
       message.error("Máy chủ không phản hồi");
@@ -49,7 +43,7 @@ export default function CategoriesPage() {
     try {
       setLoading(true);
       const response = await get_authors_and_categories();
-      
+
       if (response.success) {
         setCategories(response.data.categories || []);
       } else {
@@ -111,7 +105,7 @@ export default function CategoriesPage() {
                 onOk: async () => {
                   try {
                     const response = await del_categories(record.category_id);
-                    
+
                     if (response.success) {
                       message.success('Xóa thể loại thành công');
                       fetchCategories(); // Refresh the list
@@ -143,7 +137,7 @@ export default function CategoriesPage() {
       };
       console.log(updatedData);
       const response = await edit_categories(updatedData);
-      
+
       if (response.success) {
         message.success('Cập nhật thể loại thành công');
         setEditModalVisible(false);
@@ -213,7 +207,7 @@ export default function CategoriesPage() {
             label="Mô tả"
             name="description"
           >
-            <Input.TextArea 
+            <Input.TextArea
               placeholder="Nhập mô tả cho thể loại"
               rows={4}
             />

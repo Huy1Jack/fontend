@@ -6,7 +6,7 @@ import Image from 'next/image'
 import { Button } from './ui/Button'
 import { MOCK_BOOKS } from '../../lib/constants'
 import BookCard from './BookCard'
-import { show_books } from '@/app/sever/route'
+import { show_books } from '@/app/actions/generalActions'
 import { Book } from '../../lib/types'
 
 // Hàm xử lý đường dẫn ảnh để đảm bảo format đúng cho next/image
@@ -24,16 +24,16 @@ const resolveImageSrc = (imagePath: string | null | undefined): string => {
 export default function HomePage() {
     const [featuredBooks, setFeaturedBooks] = useState<Book[]>([])
     const [loading, setLoading] = useState(true)
-    
+
     useEffect(() => {
         const fetchFeaturedBooks = async () => {
             try {
                 setLoading(true)
                 const response = await show_books()
-                
+
                 if (response.success && response.data) {
                     const now = new Date()
-                    
+
                     // Lọc sách có UploadDate trong vòng 7 ngày
                     const recentBooks = (response.data || [])
                         .filter((b: any) => {
@@ -78,7 +78,7 @@ export default function HomePage() {
                             UploadedBy: b.UploadedBy,
                             image: b.image
                         }))
-                    
+
                     setFeaturedBooks(recentBooks)
                 } else {
                     setFeaturedBooks([])
@@ -106,7 +106,7 @@ export default function HomePage() {
                                 <br />
                                 <span className="text-yellow-300">Đại Học Vinh</span>
                             </h1>
-                            
+
                             <p className="text-xl lg:text-2xl opacity-90">
                                 Khám phá kho tàng tri thức số với hơn 100,000 đầu sách.
                                 Mượn sách online 24/7, tìm kiếm thông minh, đặt phòng học nhóm.

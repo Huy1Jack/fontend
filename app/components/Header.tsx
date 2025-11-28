@@ -11,7 +11,7 @@ import { ShoppingCart, Sun, Moon, User, LogOut, Package, BookOpen, Search } from
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { UserRole } from '../../lib/types'
-import AuthModal from './AuthModal'
+import { getAuthCookie } from "@/app/actions/authActions";
 import { show_book_search } from "@/app/sever/route";
 
 
@@ -27,8 +27,32 @@ const Header: React.FC = () => {
     const router = useRouter()
     const [isMenuOpen, setIsMenuOpen] = useState(false)
     const [searchTerm, setSearchTerm] = useState('')
+    const [userInfo, setUserInfo] = useState<{ name: string, email: string } | null>(null)
     const menuRef = useRef<HTMLDivElement>(null)
-    
+
+    const checkUser = async () => {
+        try {
+            const token = await getAuthCookie();
+            if (!token) {
+                setUserInfo(null);
+                return;
+            }
+
+            const payload = JSON.parse(atob(token.split(".")[1]));
+            setUserInfo({
+                name: payload.name,
+                email: payload.email
+            });
+        } catch (error) {
+            console.error("Error checking user:", error);
+            setUserInfo(null);
+        }
+    };
+
+    useEffect(() => {
+        checkUser();
+    }, []);
+
     const handleLogout = async () => {
         await logout()
         setIsMenuOpen(false)
@@ -41,7 +65,7 @@ const Header: React.FC = () => {
             router.push(`/books?search=${encodeURIComponent(searchTerm.trim())}`)
             setSearchTerm('')
         }
-        }
+    }
 
     // Close menu when clicking outside
     useEffect(() => {
@@ -136,11 +160,11 @@ const Header: React.FC = () => {
 
                         {isMenuOpen && (
                             <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-md shadow-lg z-50 border">
-                                {user ? (
+                                {userInfo ? (
                                     <>
                                         <div className="px-4 py-2 border-b">
-                                            <p className="text-sm font-medium">{user.name}</p>
-                                            <p className="text-xs text-muted-foreground">{user.email}</p>
+                                            <p className="text-sm font-medium">{userInfo.name}</p>
+                                            <p className="text-xs text-muted-foreground">{userInfo.email}</p>
                                         </div>
                                         <Link href="/profile" className="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">Hồ sơ cá nhân</Link>
                                         <Link href="/my-books" className="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">Sách đã mượn</Link>
@@ -154,7 +178,11 @@ const Header: React.FC = () => {
                                         </button>
                                     </>
                                 ) : (
-                                    <AuthModal onClose={() => setIsMenuOpen(false)} />
+                                    <>
+                                        <Link href="/login" className="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">Đăng nhập</Link>
+                                        <Link href="/register" className="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">Đăng ký</Link>
+                                        <Link href="/forgot-password" className="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">Quên mật khẩu</Link>
+                                    </>
                                 )}
                             </div>
                         )}

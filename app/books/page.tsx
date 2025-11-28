@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { Book } from '../../lib/types'
-import { show_books, show_book_search, add_book_review, edit_book_admin } from "@/app/sever/route"
+import { show_books, show_book_search, add_book_review, edit_book_admin } from "@/app/actions/generalActions"
 import Image from 'next/image'
 import Link from 'next/link'
 import Head from 'next/head'
@@ -119,32 +119,32 @@ const BooksPage: React.FC = () => {
   // ==============================
   const filterBooks = () => {
     let filtered = [...books]
-    
+
     if (filters.search) {
       filtered = filtered.filter(book =>
         (book.title || '').toLowerCase().includes(filters.search.toLowerCase()) ||
         (book.Title || '').toLowerCase().includes(filters.search.toLowerCase())
       )
     }
-    
+
     if (filters.author) {
       filtered = filtered.filter(book =>
         (book.author || '').toLowerCase() === filters.author.toLowerCase()
       )
     }
-    
+
     if (filters.category) {
       filtered = filtered.filter(book =>
         (book.category || '').toLowerCase() === filters.category.toLowerCase()
       )
     }
-    
+
     if (filters.documentType) {
       filtered = filtered.filter(book =>
         (book.DocumentType || '').toLowerCase() === filters.documentType.toLowerCase()
       )
     }
-    
+
     setFilteredBooks(filtered)
   }
 
@@ -323,7 +323,7 @@ const BooksPage: React.FC = () => {
                 ))}
               </Select>
             </Col>
-            
+
             <Col xs={24} sm={12} md={8} lg={3}>
               <Button onClick={resetFilters} icon={<RedoOutlined />} style={{ width: '100%' }}>
                 Xóa bộ lọc

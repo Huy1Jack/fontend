@@ -6,7 +6,7 @@ import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { setAuthCookie, getAuthCookie, clearAuthCookie } from "@/app/sever/authcookie/route";
+import { setAuthCookie, getAuthCookie, clearAuthCookie } from "@/app/actions/authActions";
 const AUTH_COOKIE_NAME = "authToken";
 
 dotenv.config();

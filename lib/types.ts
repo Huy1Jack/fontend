@@ -149,5 +149,6 @@ export interface Product {
     rating: number
     reviews: number
     inStock: boolean
+    stock: number
     tags: string[]
 }

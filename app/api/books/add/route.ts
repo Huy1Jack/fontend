@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   try {
     const token = cookies().get("token")?.value;
@@ -12,7 +14,7 @@ export async function POST(request: Request) {
     }
 
     const data = await request.json();
-    
+
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/books/add`, {
       method: "POST",
       headers: {

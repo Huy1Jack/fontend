@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
-import { show_books } from '@/app/sever/route'
+import { show_books } from '@/app/actions/generalActions'
+
+export const dynamic = 'force-dynamic';
 
 export async function POST() {
   try {

@@ -25,7 +25,6 @@ export const metadata: Metadata = {
         description: 'Trung tâm hỗ trợ và hướng dẫn sử dụng thư viện số toàn diện'
     }
 }
-
 export default function SupportPage() {
     return (
         <div className="min-h-screen py-12">

@@ -1,34 +1,43 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { check_token_reset, set_newpass } from '@/app/sever/route'
+import Link from 'next/link'
+import { Button } from '../components/ui/Button'
+import { Input } from '../components/ui/Input'
+import { Eye, EyeOff, Lock, CheckCircle, AlertCircle, ArrowLeft, Loader2, ShieldCheck } from 'lucide-react'
+import { check_token_reset, set_newpass } from '@/app/actions/generalActions'
+import { motion } from 'framer-motion'
 
 export default function ResetPasswordPage() {
     const router = useRouter()
     const searchParams = useSearchParams()
 
+    // Logic States
     const [isVerifying, setIsVerifying] = useState(true)
     const [isValid, setIsValid] = useState(false)
     const [error, setError] = useState<string>('')
     const [password, setPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
     const [submitting, setSubmitting] = useState(false)
-    const [isSuccess, setIsSuccess] = useState(false) // State mới để kiểm soát popup thành công
+    const [isSuccess, setIsSuccess] = useState(false)
     const [countdown, setCountdown] = useState(5)
+
+    // UI States (Mới thêm)
+    const [showPassword, setShowPassword] = useState(false)
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
     const token = searchParams.get('token') || ''
 
-    // Logic kiểm tra token ban đầu
+    // Logic 1: Kiểm tra token
     useEffect(() => {
         const verifyToken = async () => {
             if (!token) {
-                setError('Yêu cầu không hợp lệ. Thiếu token.')
+                setError('Đường dẫn không hợp lệ hoặc bị thiếu token.')
                 setIsVerifying(false)
                 setIsValid(false)
-                setTimeout(() => {
-                    router.push('/')
-                }, 3000)
+                // Tự động redirect sau 3s nếu lỗi token (optional)
+                setTimeout(() => router.push('/login'), 3000)
                 return
             }
 
@@ -38,18 +47,12 @@ export default function ResetPasswordPage() {
                 if (ok) {
                     setIsValid(true)
                 } else {
-                    setError('Yêu cầu không hợp lệ.')
+                    setError('Đường dẫn đặt lại mật khẩu đã hết hạn hoặc không tồn tại.')
                     setIsValid(false)
-                    setTimeout(() => {
-                        router.push('/')
-                    }, 3000)
                 }
             } catch (e: any) {
-                setError('Yêu cầu không hợp lệ.')
+                setError('Có lỗi xảy ra khi xác thực yêu cầu.')
                 setIsValid(false)
-                setTimeout(() => {
-                    router.push('/')
-                }, 3000)
             } finally {
                 setIsVerifying(false)
             }
@@ -57,7 +60,7 @@ export default function ResetPasswordPage() {
         verifyToken()
     }, [token, router])
 
-    // Logic đếm ngược và chuyển hướng
+    // Logic 2: Đếm ngược
     useEffect(() => {
         let timer: NodeJS.Timeout
         if (isSuccess && countdown > 0) {
@@ -65,12 +68,12 @@ export default function ResetPasswordPage() {
                 setCountdown(prev => prev - 1)
             }, 1000)
         } else if (isSuccess && countdown === 0) {
-            router.push('/')
+            router.push('/login') // Chuyển về login thay vì home để user đăng nhập lại
         }
         return () => clearTimeout(timer)
     }, [isSuccess, countdown, router])
 
-    // Xử lý khi người dùng gửi form
+    // Logic 3: Submit Form
     const onSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setError('')
@@ -80,7 +83,7 @@ export default function ResetPasswordPage() {
             return
         }
         if (password !== confirmPassword) {
-            setError('Mật khẩu nhập lại không khớp.')
+            setError('Mật khẩu xác nhận không khớp.')
             return
         }
 
@@ -89,152 +92,227 @@ export default function ResetPasswordPage() {
             const res = await set_newpass({ password, token })
             const ok = res?.success === true || res?.status === 200
             if (ok) {
-                setIsSuccess(true) // Kích hoạt popup thành công
-                // router.push() được gọi trong useEffect sau khi đếm ngược
+                setIsSuccess(true)
             } else {
-                setError(res?.message || 'Đặt lại mật khẩu thất bại. Thử lại sau.')
+                setError(res?.message || 'Đặt lại mật khẩu thất bại. Vui lòng thử lại.')
             }
         } catch (e: any) {
-            setError('Đặt lại mật khẩu thất bại. Thử lại sau.')
+            setError('Lỗi kết nối. Vui lòng thử lại sau.')
         } finally {
             setSubmitting(false)
         }
     }
 
-    // --- RENDER CÁC TRẠNG THÁI GIAO DIỆN ---
-
-    // 1. Trạng thái Loading/Đang xác thực
-    if (isVerifying) {
-        return (
-            <div className="flex min-h-[60vh] items-center justify-center p-4 bg-gray-50">
-                <div className="w-full max-w-md space-y-4 rounded-xl bg-white p-8 text-center shadow-lg border-t-4 border-blue-500">
+    // --- RENDER CONTENT BASED ON STATE ---
+    const renderContent = () => {
+        // 1. Trạng thái đang tải (Verifying Token)
+        if (isVerifying) {
+            return (
+                <div className="text-center space-y-4">
                     <div className="flex justify-center">
-                        <svg className="animate-spin h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                    </div>
-                    <div className="text-lg font-medium text-gray-700">Đang xác thực yêu cầu…</div>
-                    <p className="text-sm text-gray-500">Vui lòng chờ, hệ thống đang kiểm tra liên kết của bạn.</p>
-                </div>
-            </div>
-        )
-    }
-
-    // 2. Trạng thái lỗi không hợp lệ
-    if (!isValid) {
-        return (
-            <div className="flex min-h-[60vh] items-center justify-center p-4 bg-gray-50">
-                <div className="w-full max-w-md space-y-4 rounded-xl bg-white p-8 text-center shadow-lg border-t-4 border-red-500">
-                    <div className="mx-auto h-16 w-16 flex items-center justify-center rounded-full bg-red-100">
-                        <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.503-1.688 1.796-3.118l-6.928-14a2.985 2.985 0 00-2.692 0l-6.928 14c-.707 1.43.246 3.118 1.796 3.118z"></path>
-                        </svg>
-                    </div>
-                    <h1 className="text-xl font-bold text-red-700">Yêu cầu không hợp lệ</h1>
-                    <p className="text-gray-600">{error || 'Liên kết này đã hết hạn hoặc không tồn tại.'}</p>
-                    <button
-                        onClick={() => router.push('/')}
-                        className="mt-4 w-full rounded-xl bg-gray-200 px-6 py-3 text-gray-700 font-semibold hover:bg-gray-300 transition-colors shadow-md"
-                    >
-                        Về Trang Chủ
-                    </button>
-                </div>
-            </div>
-        )
-    }
-
-    // 3. Trạng thái thành công (Popup mới)
-    if (isSuccess) {
-        return (
-            <div className="flex min-h-[80vh] items-center justify-center p-4 bg-gray-50">
-                <div className="w-full max-w-md space-y-6 rounded-3xl bg-white p-8 text-center shadow-2xl border-t-4 border-green-500">
-                    <div className="mx-auto h-16 w-16 flex items-center justify-center rounded-full bg-green-100">
-                        <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                        </svg>
-                    </div>
-                    <h1 className="text-2xl font-bold text-gray-800">Hoàn tất!</h1>
-                    <p className="text-gray-600">
-                        Mật khẩu của bạn đã được cập nhật thành công. 
-                        Bạn sẽ được chuyển về trang chủ sau <span className="text-blue-600 font-bold">{countdown}</span> giây.
-                    </p>
-                    <button
-                        onClick={() => router.push('/')}
-                        className="w-full rounded-xl bg-blue-600 px-6 py-3 text-white font-semibold hover:bg-blue-700 transition-colors shadow-md"
-                    >
-                        Về trang chủ ngay
-                    </button>
-                </div>
-            </div>
-        )
-    }
-
-    // 4. Trạng thái form chính để nhập mật khẩu mới
-    return (
-        <div className="flex min-h-[80vh] items-center justify-center p-4 bg-gray-50">
-            <form onSubmit={onSubmit} className="w-full max-w-lg space-y-6 rounded-3xl bg-white p-8 shadow-2xl transition-all duration-300">
-                <hgroup className='text-center'>
-                    <h1 className="text-3xl font-extrabold text-gray-900">Đặt Lại Mật Khẩu</h1>
-                    <p className="text-gray-500 mt-2">Nhập mật khẩu mới (tối thiểu 8 ký tự).</p>
-                </hgroup>
-
-                {error && (
-                    <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 font-medium transition-opacity duration-300">
-                        {error}
-                    </div>
-                )}
-
-                <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-700 block" htmlFor="password">
-                        Mật khẩu mới
-                    </label>
-                    <input
-                        id="password"
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="w-full rounded-xl border border-gray-300 px-5 py-3 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-gray-400 bg-white text-gray-900 transition-colors shadow-sm"
-                        placeholder="••••••••"
-                        required
-                        minLength={8}
-                        disabled={submitting}
-                    />
-                </div>
-
-                <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-700 block" htmlFor="confirmPassword">
-                        Nhập lại mật khẩu mới
-                    </label>
-                    <input
-                        id="confirmPassword"
-                        type="password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="w-full rounded-xl border border-gray-300 px-5 py-3 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-gray-400 bg-white text-gray-900 transition-colors shadow-sm"
-                        placeholder="••••••••"
-                        required
-                        minLength={8}
-                        disabled={submitting}
-                    />
-                </div>
-
-                <button
-                    type="submit"
-                    disabled={submitting || password.length < 8 || password !== confirmPassword}
-                    className="w-full rounded-xl bg-blue-600 px-6 py-3 text-lg text-white font-bold hover:bg-blue-700 transition-all duration-200 shadow-xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.01] active:scale-95"
-                >
-                    {submitting ? (
-                        <div className="flex items-center justify-center space-x-2">
-                            <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <span>Đang cập nhật…</span>
+                        <div className="h-16 w-16 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
+                            <Loader2 className="h-8 w-8 text-blue-600 animate-spin" />
                         </div>
-                    ) : 'Cập Nhật Mật Khẩu'}
-                </button>
-            </form>
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Đang xác thực...</h2>
+                    <p className="text-gray-500 dark:text-gray-400">Vui lòng đợi trong giây lát, hệ thống đang kiểm tra liên kết của bạn.</p>
+                </div>
+            )
+        }
+
+        // 2. Trạng thái Token không hợp lệ
+        if (!isValid) {
+            return (
+                <div className="text-center space-y-6">
+                    <div className="flex justify-center">
+                        <div className="h-16 w-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center">
+                            <AlertCircle className="h-8 w-8 text-red-600" />
+                        </div>
+                    </div>
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Liên kết không hợp lệ</h2>
+                        <p className="mt-2 text-gray-500 dark:text-gray-400">{error}</p>
+                    </div>
+                    <Button onClick={() => router.push('/login')} variant="outline" className="w-full">
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Quay lại trang đăng nhập
+                    </Button>
+                </div>
+            )
+        }
+
+        // 3. Trạng thái Thành công
+        if (isSuccess) {
+            return (
+                <div className="text-center space-y-6">
+                    <div className="flex justify-center">
+                        <div className="h-16 w-16 bg-green-50 dark:bg-green-900/20 rounded-full flex items-center justify-center">
+                            <CheckCircle className="h-8 w-8 text-green-600" />
+                        </div>
+                    </div>
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Đổi mật khẩu thành công!</h2>
+                        <p className="mt-2 text-gray-500 dark:text-gray-400">
+                            Tài khoản của bạn đã được cập nhật mật khẩu mới. <br />
+                            Tự động chuyển trang sau <span className="font-bold text-blue-600">{countdown}s</span>
+                        </p>
+                    </div>
+                    <Button onClick={() => router.push('/login')} className="w-full bg-blue-600 hover:bg-blue-700">
+                        Đăng nhập ngay
+                    </Button>
+                </div>
+            )
+        }
+
+        // 4. Trạng thái Form nhập mật khẩu (Default)
+        return (
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="w-full max-w-md space-y-8"
+            >
+                <div className="text-center lg:text-left">
+                    <h2 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+                        Đặt lại mật khẩu
+                    </h2>
+                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                        Vui lòng nhập mật khẩu mới cho tài khoản của bạn.
+                    </p>
+                </div>
+
+                <form className="mt-8 space-y-5" onSubmit={onSubmit}>
+
+                    {/* New Password */}
+                    <div>
+                        <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                            Mật khẩu mới
+                        </label>
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                                <Lock className="h-5 w-5" />
+                            </div>
+                            <Input
+                                id="password"
+                                type={showPassword ? 'text' : 'password'}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="pl-10 pr-10 h-11 bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800 focus:ring-2 focus:ring-blue-500 transition-all"
+                                placeholder="••••••••"
+                                required
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Confirm Password */}
+                    <div>
+                        <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                            Xác nhận mật khẩu
+                        </label>
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                                <ShieldCheck className="h-5 w-5" />
+                            </div>
+                            <Input
+                                id="confirmPassword"
+                                type={showConfirmPassword ? 'text' : 'password'}
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                className="pl-10 pr-10 h-11 bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800 focus:ring-2 focus:ring-blue-500 transition-all"
+                                placeholder="••••••••"
+                                required
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                                {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Error Message */}
+                    {error && (
+                        <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800"
+                        >
+                            <p className="text-sm text-red-600 dark:text-red-400 text-center font-medium">
+                                {error}
+                            </p>
+                        </motion.div>
+                    )}
+
+                    {/* Submit Button */}
+                    <Button
+                        type="submit"
+                        className="w-full h-11 text-base font-medium bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 transition-all duration-200"
+                        disabled={submitting || password.length < 8 || password !== confirmPassword}
+                    >
+                        {submitting ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Đang cập nhật...
+                            </>
+                        ) : (
+                            'Đổi mật khẩu'
+                        )}
+                    </Button>
+
+                    <div className="text-center">
+                        <Link href="/login" className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors">
+                            ← Quay lại đăng nhập
+                        </Link>
+                    </div>
+                </form>
+            </motion.div>
+        )
+    }
+
+    return (
+        <div className="min-h-screen flex bg-white dark:bg-gray-950">
+            {/* Left Side: Decorative Image */}
+            <div className="hidden lg:flex lg:w-1/2 relative bg-gray-900 overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-900/90 to-slate-900/90 z-10" />
+                <div
+                    className="absolute inset-0 bg-cover bg-center"
+                    style={{ backgroundImage: "url('https://images.unsplash.com/photo-1555949963-aa79dcee981c?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80')" }}
+                />
+                <div className="relative z-20 flex flex-col justify-between w-full h-full p-12 text-white">
+                    <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded bg-white/20 backdrop-blur flex items-center justify-center">
+                            <span className="font-bold">V</span>
+                        </div>
+                        <span className="text-xl font-bold tracking-tight">VinhUni System</span>
+                    </div>
+
+                    <div className="space-y-6">
+                        <blockquote className="text-2xl font-medium leading-relaxed">
+                            "Bảo mật thông tin là ưu tiên hàng đầu của chúng tôi. Hãy đảm bảo mật khẩu mới của bạn đủ mạnh và an toàn."
+                        </blockquote>
+                    </div>
+
+                    <div className="text-sm text-blue-200/60">
+                        © 2025 Vinh University. All rights reserved.
+                    </div>
+                </div>
+            </div>
+
+            {/* Right Side: Dynamic Content */}
+            <div className="flex-1 flex items-center justify-center p-4 sm:p-12 lg:p-24 relative">
+                <div className="w-full max-w-md">
+                    {renderContent()}
+                </div>
+            </div>
         </div>
     )
 }

@@ -245,3 +245,45 @@ export const MOCK_FAQS: FAQItem[] = [
         answer: 'Hiện tại, chúng tôi chỉ hỗ trợ thanh toán khi nhận hàng (COD) cho mục đích demo. Chúng tôi đang làm việc để tích hợp các cổng thanh toán trực tuyến trong tương lai gần.'
     }
 ]
+
+export const MOCK_PRODUCTS: Product[] = [
+    {
+        id: '1',
+        name: 'Laptop Gaming XYZ',
+        description: 'Laptop gaming cao cấp với card đồ họa RTX 4070',
+        price: 25000000,
+        category: 'Laptop',
+        imageUrl: 'https://picsum.photos/seed/product1/300/300',
+        rating: 4.5,
+        reviews: 120,
+        inStock: true,
+        stock: 10,
+        tags: ['gaming', 'laptop', 'rtx']
+    },
+    {
+        id: '2',
+        name: 'Tai nghe Bluetooth ABC',
+        description: 'Tai nghe không dây chất lượng cao với thời lượng pin 30 giờ',
+        price: 1500000,
+        category: 'Tai nghe',
+        imageUrl: 'https://picsum.photos/seed/product2/300/300',
+        rating: 4.8,
+        reviews: 85,
+        inStock: true,
+        stock: 25,
+        tags: ['bluetooth', 'wireless', 'music']
+    },
+    {
+        id: '3',
+        name: 'Điện thoại thông minh DEF',
+        description: 'Điện thoại flagship với camera 108MP và màn hình AMOLED',
+        price: 18000000,
+        category: 'Điện thoại',
+        imageUrl: 'https://picsum.photos/seed/product3/300/300',
+        rating: 4.7,
+        reviews: 200,
+        inStock: false,
+        stock: 0,
+        tags: ['smartphone', 'camera', 'amoled']
+    }
+]

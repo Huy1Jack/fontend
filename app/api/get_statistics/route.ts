@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
-import { get_statistics } from '@/app/sever/admin/route'
+import { get_statistics } from '@/app/actions/adminActions'
+
+export const dynamic = 'force-dynamic';
 
 export async function POST() {
   try {

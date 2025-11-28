@@ -2,9 +2,9 @@
 import { useEffect, useState } from 'react';
 import { Table, Space, Button, Input, Modal, message, DatePicker } from 'antd';
 import { EditOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
-import { get_authors_and_categories, del_authors, edit_authors } from '@/app/sever/admin/route';
+import { get_authors_and_categories, del_authors, edit_authors } from '@/app/actions/adminActions';
 import type { ColumnsType } from 'antd/es/table';
-import { getAuthCookie } from "@/app/sever/authcookie/route";
+import { getAuthCookie } from "@/app/actions/authActions";
 import { useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
 interface Author {
