@@ -1,187 +1,451 @@
-import type { Metadata } from 'next'
+'use client'
 
-export const metadata: Metadata = {
-    title: 'Hồ Sơ Cá Nhân - Thư Viện Số Đại Học Vinh | Quản Lý Tài Khoản',
-    description: 'Quản lý hồ sơ cá nhân tại Thư viện số Đại học Vinh. Cập nhật thông tin, xem lịch sử mượn sách, gia hạn sách, đổi mật khẩu và cài đặt tài khoản.',
-    keywords: [
-        'hồ sơ cá nhân thư viện',
-        'quản lý tài khoản Vinh University',
-        'lịch sử mượn sách',
-        'gia hạn sách online',
-        'đổi mật khẩu thư viện',
-        'cập nhật thông tin sinh viên',
-        'my profile library'
-    ],
-    robots: {
-        index: false,
-        follow: true,
-    }
+import React, { useEffect, useState } from 'react'
+import Image from 'next/image'
+import { 
+    Layout, Card, Row, Col, Typography, Form, Input, Button, 
+    Avatar, Tabs, Statistic, Divider, Tag, message, Skeleton, Space, Modal 
+} from 'antd'
+import { 
+    UserOutlined, MailOutlined, PhoneOutlined, 
+    SafetyCertificateOutlined, HistoryOutlined, 
+    EditOutlined, CameraOutlined, ReadOutlined, FieldTimeOutlined,
+    BookOutlined, LockOutlined, KeyOutlined, CheckCircleOutlined
+} from '@ant-design/icons'
+import { getAuthCookie } from '@/app/actions/authActions'
+import { change_password } from '@/app/sever/route'
+const { Title, Text, Paragraph } = Typography
+
+interface UserInfo {
+    id?: number | string;
+    name?: string;
+    username?: string;
+    email?: string;
+    role?: number;
+    phone?: string;
+    address?: string;
+    avatar?: string;
+    iat?: number;
+    exp?: number;
 }
 
 export default function ProfilePage() {
+    const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+    const [loading, setLoading] = useState(true);
+    
+    // --- STATE CHO MODAL ĐỔI MẬT KHẨU ---
+    const [isPassModalOpen, setIsPassModalOpen] = useState(false);
+    const [passLoading, setPassLoading] = useState(false);
+    
+    const [form] = Form.useForm();
+    const [passForm] = Form.useForm();
+
+    // --- LOGIC: CHECK USER & DECODE TOKEN ---
+    useEffect(() => {
+        const checkUser = async () => {
+            try {
+                const token = await getAuthCookie();
+                
+                if (!token) {
+                    setUserInfo(null);
+                    setLoading(false);
+                    return;
+                }
+
+                const base64Url = token.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+
+                const payload = JSON.parse(jsonPayload);
+
+                setUserInfo({
+                    id: payload.id || payload.sub,
+                    name: payload.username || payload.name,
+                    email: payload.email,
+                    role: payload.role,
+                    phone: payload.phone,
+                    address: payload.address,
+                    avatar: payload.avatar || payload.image
+                });
+
+                form.setFieldsValue({
+                    username: payload.username || payload.name,
+                    email: payload.email,
+                    studentId: payload.id || 'SV---',
+                    phone: payload.phone || '',
+                    address: payload.address || ''
+                });
+
+            } catch (error) {
+                console.error("Error checking user:", error);
+                setUserInfo(null);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        checkUser();
+    }, [form]);
+
+    const handleUpdate = (values: any) => {
+        message.loading({ content: 'Đang cập nhật hồ sơ...', key: 'update' });
+        setTimeout(() => {
+            message.success({ content: 'Cập nhật thông tin thành công!', key: 'update' });
+        }, 1500);
+    };
+
+    // --- LOGIC GỌI API ĐỔI MẬT KHẨU (ĐÃ CẬP NHẬT) ---
+    const handleChangePassword = async (values: any) => {
+        setPassLoading(true);
+        try {
+            // 1. Lấy token hiện tại để xác thực
+            const token = await getAuthCookie();
+            
+            if (!token) {
+                message.error('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+                setPassLoading(false);
+                return;
+            }
+
+            // 2. Tạo object datauser chứa đầy đủ thông tin cần thiết
+            const dataUserPayload = {
+                token: token,                    // Token để định danh user
+                old_password: values.oldPassword, // Mật khẩu cũ từ form
+                new_password: values.newPassword  // Mật khẩu mới từ form
+            };
+
+            // 3. Gọi server action với 1 tham số object duy nhất
+            const response = await change_password(dataUserPayload);
+            console.log(response);
+            if (response && response.success) {
+                message.success('Đổi mật khẩu thành công! Vui lòng đăng nhập lại.');
+                setIsPassModalOpen(false);
+                passForm.resetFields();
+            } else {
+                message.error(response?.message || 'Mật khẩu cũ không chính xác hoặc có lỗi xảy ra.');
+            }
+        } catch (error) {
+            console.error('Change password error:', error);
+            message.error('Lỗi kết nối hệ thống.');
+        } finally {
+            setPassLoading(false);
+        }
+    };
+
+    // --- STYLES CONFIGURATION ---
+    const pageStyle: React.CSSProperties = {
+        minHeight: '100vh',
+        background: '#f0f2f5',
+        paddingBottom: '40px',
+    };
+
+    const headerBackgroundStyle: React.CSSProperties = {
+        height: '280px',
+        background: 'linear-gradient(120deg, #1890ff 0%, #0050b3 100%)',
+        marginBottom: '-100px',
+        borderRadius: '0 0 50% 10% / 0 0 20px 20px',
+        position: 'relative',
+        overflow: 'hidden'
+    };
+
+    const cardStyle: React.CSSProperties = {
+        borderRadius: '16px',
+        boxShadow: '0 10px 40px rgba(0,0,0,0.06)',
+        border: 'none',
+        overflow: 'hidden',
+        background: '#ffffff'
+    };
+
+    if (loading) {
+        return (
+            <div style={{ padding: '50px', display: 'flex', justifyContent: 'center', background: '#f0f2f5', minHeight: '100vh' }}>
+                <Skeleton active avatar paragraph={{ rows: 6 }} style={{ maxWidth: 800 }} />
+            </div>
+        );
+    }
+
     return (
-        <div className="min-h-screen py-12">
-            <div className="container mx-auto px-4 max-w-4xl">
-                <div className="text-center mb-12">
-                    <h1 className="text-3xl font-bold mb-4">Hồ Sơ Cá Nhân</h1>
-                    <p className="text-gray-600">
-                        Quản lý thông tin tài khoản và hoạt động thư viện của bạn
-                    </p>
-                </div>
-
-                <div className="grid md:grid-cols-3 gap-8">
-                    {/* Sidebar */}
-                    <div className="bg-white rounded-lg border p-6">
-                        <div className="text-center mb-6">
-                            <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <span className="text-2xl font-bold text-blue-600">SV</span>
-                            </div>
-                            <h3 className="font-semibold">Sinh viên</h3>
-                            <p className="text-sm text-gray-600">ID: SV2024001</p>
-                        </div>
-                        <nav className="space-y-2">
-                            <a href="#" className="block px-4 py-2 bg-blue-50 text-blue-600 rounded-lg">
-                                Thông tin cá nhân
-                            </a>
-                            <a href="#" className="block px-4 py-2 hover:bg-gray-50 rounded-lg">
-                                Sách đang mượn
-                            </a>
-                            <a href="#" className="block px-4 py-2 hover:bg-gray-50 rounded-lg">
-                                Lịch sử mượn
-                            </a>
-                            <a href="#" className="block px-4 py-2 hover:bg-gray-50 rounded-lg">
-                                Phòng đã đặt
-                            </a>
-                            <a href="#" className="block px-4 py-2 hover:bg-gray-50 rounded-lg">
-                                Đổi mật khẩu
-                            </a>
-                        </nav>
-                    </div>
-
-                    {/* Main Content */}
-                    <div className="md:col-span-2 bg-white rounded-lg border p-6">
-                        <h2 className="text-2xl font-bold mb-6">Thông Tin Cá Nhân</h2>
-                        <form className="space-y-6">
-                            <div className="grid md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Họ và tên
-                                    </label>
-                                    <input
-                                        type="text"
-                                        defaultValue="Nguyễn Văn A"
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Mã sinh viên
-                                    </label>
-                                    <input
-                                        type="text"
-                                        defaultValue="SV2024001"
-                                        disabled
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Email
-                                    </label>
-                                    <input
-                                        type="email"
-                                        defaultValue="nguyenvana@vinhuni.edu.vn"
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Số điện thoại
-                                    </label>
-                                    <input
-                                        type="tel"
-                                        defaultValue="0987654321"
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Khoa
-                                    </label>
-                                    <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                        <option>Khoa Công nghệ thông tin</option>
-                                        <option>Khoa Toán - Tin</option>
-                                        <option>Khoa Vật lý</option>
-                                        <option>Khoa Hóa học</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Năm học
-                                    </label>
-                                    <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                        <option>2024-2025</option>
-                                        <option>2023-2024</option>
-                                        <option>2022-2023</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Địa chỉ
-                                </label>
-                                <textarea
-                                    rows={3}
-                                    defaultValue="123 Đường ABC, Phường XYZ, Thành phố Vinh, Nghệ An"
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                ></textarea>
-                            </div>
-
-                            <div className="flex gap-4">
-                                <button
-                                    type="submit"
-                                    className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
-                                >
-                                    Cập nhật thông tin
-                                </button>
-                                <button
-                                    type="button"
-                                    className="border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors"
-                                >
-                                    Hủy bỏ
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                {/* Quick Stats */}
-                <div className="grid md:grid-cols-4 gap-6 mt-12">
-                    <div className="bg-white rounded-lg border p-6 text-center">
-                        <div className="text-3xl font-bold text-blue-600 mb-2">3</div>
-                        <div className="text-sm text-gray-600">Sách đang mượn</div>
-                    </div>
-                    <div className="bg-white rounded-lg border p-6 text-center">
-                        <div className="text-3xl font-bold text-green-600 mb-2">27</div>
-                        <div className="text-sm text-gray-600">Sách đã mượn</div>
-                    </div>
-                    <div className="bg-white rounded-lg border p-6 text-center">
-                        <div className="text-3xl font-bold text-purple-600 mb-2">5</div>
-                        <div className="text-sm text-gray-600">Phòng đã đặt</div>
-                    </div>
-                    <div className="bg-white rounded-lg border p-6 text-center">
-                        <div className="text-3xl font-bold text-orange-600 mb-2">12</div>
-                        <div className="text-sm text-gray-600">Điểm tích lũy</div>
-                    </div>
+        <div style={pageStyle}>
+            {/* Header Background */}
+            <div style={headerBackgroundStyle}>
+                <div style={{ position: 'absolute', top: -50, right: -50, width: 300, height: 300, background: 'rgba(255,255,255,0.1)', borderRadius: '50%' }} />
+                <div style={{ position: 'absolute', bottom: 50, left: 50, width: 100, height: 100, background: 'rgba(255,255,255,0.05)', borderRadius: '50%' }} />
+                
+                <div style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 24px', color: '#fff', textAlign: 'center' }}>
+                    <Title level={2} style={{ color: '#fff', marginBottom: 8 }}>Hồ Sơ Cá Nhân</Title>
+                    <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 16 }}>Quản lý thông tin tài khoản và hoạt động thư viện</Text>
                 </div>
             </div>
+
+            <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px' }}>
+                <Row gutter={[24, 24]}>
+                    {/* --- LEFT COLUMN: PROFILE CARD --- */}
+                    <Col xs={24} lg={8}>
+                        <Card style={cardStyle} bodyStyle={{ padding: '100px 24px 30px 24px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '-60px' }}>
+                                
+                                {/* Avatar */}
+                                <div style={{ 
+                                    padding: '4px', 
+                                    background: '#fff', 
+                                    borderRadius: '50%', 
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                    width: 128, height: 128,
+                                    display: 'flex', justifyContent: 'center', alignItems: 'center'
+                                }}>
+                                    {userInfo?.avatar ? (
+                                        <div style={{ position: 'relative', width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden' }}>
+                                            <Image 
+                                                src={userInfo.avatar.startsWith('http') ? userInfo.avatar : `/api/get_file?file=${userInfo.avatar}`}
+                                                alt="Avatar" fill style={{ objectFit: 'cover' }} sizes="128px"
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: '#fde3cf', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#f56a00', fontSize: '48px', fontWeight: 600 }}>
+                                            {userInfo?.name ? userInfo.name.charAt(0).toUpperCase() : <UserOutlined />}
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                <Title level={3} style={{ marginTop: 16, marginBottom: 4 }}>
+                                    {userInfo?.name || 'Người dùng'}
+                                </Title>
+
+                                <div style={{ width: '100%', marginTop: 24 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #f0f0f0' }}>
+                                        <Text type="secondary"><SafetyCertificateOutlined /> ID Tài khoản</Text>
+                                        <Text strong>{userInfo?.id || '---'}</Text>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #f0f0f0' }}>
+                                        <Text type="secondary"><MailOutlined /> Email</Text>
+                                        <Text strong ellipsis style={{ maxWidth: '180px' }}>{userInfo?.email || '---'}</Text>
+                                    </div>
+                                </div>
+                                
+                                <Button type="dashed" block icon={<CameraOutlined />} style={{ marginTop: 24 }}>
+                                    Đổi ảnh đại diện
+                                </Button>
+                            </div>
+                        </Card>
+
+                        {/* Quick Menu */}
+                        <Card style={{ ...cardStyle, marginTop: 24 }} title="Menu Quản Lý">
+                            <Space direction="vertical" style={{ width: '100%' }} size={4}>
+                                <Button type="text" block style={{ textAlign: 'left', height: 45 }} icon={<UserOutlined />}>Thông tin cá nhân</Button>
+                                <Button type="text" block style={{ textAlign: 'left', height: 45 }} icon={<HistoryOutlined />}>Lịch sử mượn trả</Button>
+                                <Button type="text" block style={{ textAlign: 'left', height: 45 }} icon={<BookOutlined />}>Sách đang mượn</Button>
+                                <Button type="text" block style={{ textAlign: 'left', height: 45 }} icon={<SafetyCertificateOutlined />} onClick={() => setIsPassModalOpen(true)}>Đổi mật khẩu</Button>
+                            </Space>
+                        </Card>
+                    </Col>
+
+                    {/* --- RIGHT COLUMN: MAIN CONTENT --- */}
+                    <Col xs={24} lg={16}>
+                        {/* Quick Stats */}
+                        <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+                            <Col xs={12} sm={6}>
+                                <Card style={{ ...cardStyle, textAlign: 'center' }} bodyStyle={{ padding: 16 }}>
+                                    <Statistic title="Đang mượn" value={3} valueStyle={{ color: '#1890ff', fontWeight: 'bold' }} prefix={<ReadOutlined />} />
+                                </Card>
+                            </Col>
+                            <Col xs={12} sm={6}>
+                                <Card style={{ ...cardStyle, textAlign: 'center' }} bodyStyle={{ padding: 16 }}>
+                                    <Statistic title="Đã trả" value={27} valueStyle={{ color: '#52c41a', fontWeight: 'bold' }} />
+                                </Card>
+                            </Col>
+                            <Col xs={12} sm={6}>
+                                <Card style={{ ...cardStyle, textAlign: 'center' }} bodyStyle={{ padding: 16 }}>
+                                    <Statistic title="Vi phạm" value={0} valueStyle={{ color: '#ff4d4f', fontWeight: 'bold' }} />
+                                </Card>
+                            </Col>
+                            <Col xs={12} sm={6}>
+                                <Card style={{ ...cardStyle, textAlign: 'center' }} bodyStyle={{ padding: 16 }}>
+                                    <Statistic title="Điểm tích lũy" value={120} valueStyle={{ color: '#faad14', fontWeight: 'bold' }} />
+                                </Card>
+                            </Col>
+                        </Row>
+
+                        {/* Main Tabs */}
+                        <Card style={cardStyle}>
+                            <Tabs
+                                defaultActiveKey="1"
+                                size="large"
+                                items={[
+                                    {
+                                        key: '1',
+                                        label: <span><UserOutlined /> Cập nhật thông tin</span>,
+                                        children: (
+                                            <div style={{ paddingTop: 16 }}>
+                                                <Form form={form} layout="vertical" onFinish={handleUpdate}>
+                                                    <Row gutter={24}>
+                                                        <Col xs={24} md={12}>
+                                                            <Form.Item label="Họ và tên" name="username" rules={[{ required: true, message: 'Vui lòng nhập họ tên' }]}>
+                                                                <Input size="large" prefix={<UserOutlined className="site-form-item-icon" />} />
+                                                            </Form.Item>
+                                                        </Col>
+                                                        <Col xs={24} md={12}>
+                                                            <Form.Item label="Mã sinh viên / ID" name="studentId">
+                                                                <Input size="large" disabled style={{ color: '#595959', cursor: 'default' }} />
+                                                            </Form.Item>
+                                                        </Col>
+                                                        <Col xs={24} md={12}>
+                                                            <Form.Item label="Email" name="email">
+                                                                <Input size="large" disabled prefix={<MailOutlined />} />
+                                                            </Form.Item>
+                                                        </Col>
+                                                        <Col xs={24} md={12}>
+                                                            <Form.Item label="Số điện thoại" name="phone">
+                                                                <Input size="large" prefix={<PhoneOutlined />} placeholder="Cập nhật SĐT..." />
+                                                            </Form.Item>
+                                                        </Col>
+                                                        <Col span={24}>
+                                                            <Form.Item label="Địa chỉ liên hệ" name="address">
+                                                                <Input.TextArea rows={3} showCount maxLength={200} placeholder="Nhập địa chỉ của bạn..." />
+                                                            </Form.Item>
+                                                        </Col>
+                                                    </Row>
+                                                    <Divider />
+                                                    <div style={{ textAlign: 'right' }}>
+                                                        <Space>
+                                                            <Button size="large">Hủy bỏ</Button>
+                                                            <Button type="primary" htmlType="submit" size="large" icon={<EditOutlined />}>Lưu thay đổi</Button>
+                                                        </Space>
+                                                    </div>
+                                                </Form>
+                                            </div>
+                                        )
+                                    },
+                                    {
+                                        key: '2',
+                                        label: <span><SafetyCertificateOutlined /> Bảo mật</span>,
+                                        children: (
+                                            <div style={{ padding: '20px 0', textAlign: 'center' }}>
+                                                <div style={{ width: 100, height: 100, background: '#f5f5f5', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                                                     <SafetyCertificateOutlined style={{ fontSize: 40, color: '#1890ff' }} />
+                                                </div>
+                                                <Title level={4}>Đổi mật khẩu</Title>
+                                                <Paragraph type="secondary">Vui lòng sử dụng mật khẩu mạnh để bảo vệ tài khoản của bạn.</Paragraph>
+                                                <Button 
+                                                    type="primary" 
+                                                    danger 
+                                                    ghost 
+                                                    size="large"
+                                                    icon={<LockOutlined />}
+                                                    onClick={() => setIsPassModalOpen(true)}
+                                                >
+                                                    Đổi mật khẩu ngay
+                                                </Button>
+                                            </div>
+                                        )
+                                    }
+                                ]}
+                            />
+                        </Card>
+                    </Col>
+                </Row>
+            </div>
+
+            {/* --- MODAL ĐỔI MẬT KHẨU --- */}
+            <Modal
+                title={null}
+                open={isPassModalOpen}
+                onCancel={() => {
+                    setIsPassModalOpen(false);
+                    passForm.resetFields();
+                }}
+                footer={null}
+                centered
+                width={450}
+                styles={{ content: { borderRadius: '16px', overflow: 'hidden', padding: 0 } }}
+            >
+                <div style={{ background: '#f5f5f5', padding: '30px 20px', textAlign: 'center', borderBottom: '1px solid #f0f0f0' }}>
+                    <div style={{ 
+                        width: 60, height: 60, background: '#fff', borderRadius: '50%', 
+                        margin: '0 auto 15px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: '0 4px 10px rgba(0,0,0,0.05)'
+                    }}>
+                        <LockOutlined style={{ fontSize: 28, color: '#ff4d4f' }} />
+                    </div>
+                    <Title level={4} style={{ margin: 0 }}>Đổi Mật Khẩu</Title>
+                    <Text type="secondary" style={{ fontSize: 13 }}>Tăng cường bảo mật cho tài khoản của bạn</Text>
+                </div>
+
+                <div style={{ padding: '24px 32px' }}>
+                    <Form
+                        form={passForm}
+                        layout="vertical"
+                        onFinish={handleChangePassword}
+                    >
+                        <Form.Item
+                            name="oldPassword"
+                            label="Mật khẩu hiện tại"
+                            rules={[{ required: true, message: 'Vui lòng nhập mật khẩu hiện tại' }]}
+                        >
+                            <Input.Password 
+                                size="large" 
+                                prefix={<KeyOutlined style={{ color: '#bfbfbf' }} />} 
+                                placeholder="Nhập mật khẩu cũ..." 
+                                style={{ borderRadius: 8 }}
+                            />
+                        </Form.Item>
+
+                        <Form.Item
+                            name="newPassword"
+                            label="Mật khẩu mới"
+                            rules={[
+                                { required: true, message: 'Vui lòng nhập mật khẩu mới' },
+                                { min: 6, message: 'Mật khẩu phải có ít nhất 6 ký tự' }
+                            ]}
+                        >
+                            <Input.Password 
+                                size="large" 
+                                prefix={<SafetyCertificateOutlined style={{ color: '#bfbfbf' }} />} 
+                                placeholder="Nhập mật khẩu mới..." 
+                                style={{ borderRadius: 8 }}
+                            />
+                        </Form.Item>
+
+                        <Form.Item
+                            name="confirmPassword"
+                            label="Xác nhận mật khẩu mới"
+                            dependencies={['newPassword']}
+                            rules={[
+                                { required: true, message: 'Vui lòng nhập lại mật khẩu mới' },
+                                ({ getFieldValue }) => ({
+                                    validator(_, value) {
+                                        if (!value || getFieldValue('newPassword') === value) {
+                                            return Promise.resolve();
+                                        }
+                                        return Promise.reject(new Error('Mật khẩu xác nhận không khớp!'));
+                                    },
+                                }),
+                            ]}
+                        >
+                            <Input.Password 
+                                size="large" 
+                                prefix={<CheckCircleOutlined style={{ color: '#bfbfbf' }} />} 
+                                placeholder="Nhập lại mật khẩu mới..." 
+                                style={{ borderRadius: 8 }}
+                            />
+                        </Form.Item>
+
+                        <Form.Item style={{ marginBottom: 0, marginTop: 12 }}>
+                            <Button 
+                                type="primary" 
+                                htmlType="submit" 
+                                block 
+                                size="large" 
+                                loading={passLoading}
+                                style={{ height: 45, borderRadius: 8, background: '#1890ff' }}
+                            >
+                                Xác nhận đổi mật khẩu
+                            </Button>
+                        </Form.Item>
+                    </Form>
+                </div>
+            </Modal>
         </div>
     )
 }

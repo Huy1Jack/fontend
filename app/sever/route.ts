@@ -2,7 +2,6 @@
 
 import axios from "axios";
 import { Metadata } from "next";
-import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
@@ -104,7 +103,7 @@ export async function forgot_password(datauser): Promise<any> {
       message: "Missing data.",
     };
   }
-
+  console.log(datauser);
   try {
     const response = await callPythonAPI("forgot_password", { datauser, api_key: API_KEY });
     return response;
@@ -116,6 +115,26 @@ export async function forgot_password(datauser): Promise<any> {
   }
 }
 
+export async function change_password(datauser): Promise<any> {
+  const cookieStore = cookies();
+  const token = cookieStore.get("authToken")?.value || "Không có token";
+  if (!datauser) {
+    return {
+      success: false,
+      message: "Missing data.",
+    };
+  }
+
+  try {
+    const response = await callPythonAPI("change_password", { token, datauser, api_key: API_KEY });
+    return response;
+  } catch (error) {
+    return {
+      success: false,
+      message: error.message || "Check failed.",
+    };
+  }
+}
 
 export async function check_token_reset(datauser): Promise<any> {
   if (!datauser) {

@@ -49,7 +49,6 @@ const resolveImageSrc = (imagePath: string): string => {
 const BookCard: React.FC<BookCardProps> = ({ book }) => {
     const { borrowBook } = useBorrow()
     const { isFavorite, toggleFavorite } = useFavorites()
-    console.log(book);
     // Lấy dữ liệu trực tiếp từ props, không cần cast "any"
     const targetId = book.books_id
     const detailsHref = `/books/details?books_id=${encodeURIComponent(String(targetId))}`
