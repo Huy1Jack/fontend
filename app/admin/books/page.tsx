@@ -1,9 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import Image from "next/image"; // Import next/image
+import Image from "next/image";
 import {
   Table,
-  Space,
   Button,
   Input,
   Select,
@@ -13,22 +12,28 @@ import {
   Form,
   Upload,
   Tag,
-  Row,
-  Col,
-  Typography,
   Tooltip,
-  Divider,
+  Empty,
+  Tabs,
+  Pagination
 } from "antd";
 import {
-  EditOutlined,
-  DeleteOutlined,
-  PlusOutlined,
-  UploadOutlined,
-  SearchOutlined,
-  ReadOutlined,
-  FilePdfOutlined,
-  FilterOutlined,
-} from "@ant-design/icons";
+  Edit,
+  Trash2,
+  Plus,
+  Search,
+  Filter,
+  BookOpen,
+  Upload as UploadIcon,
+  FileText,
+  Eye,
+  EyeOff,
+  LayoutGrid,
+  List as ListIcon,
+  CalendarDays,
+  Hash,
+  Languages
+} from "lucide-react";
 import {
   get_book_admin,
   del_book_admin,
@@ -39,10 +44,9 @@ import {
 } from "@/app/actions/adminActions";
 import { getAuthCookie } from "@/app/actions/authActions";
 import { useRouter } from "next/navigation";
+import type { UploadChangeParam } from "antd/es/upload";
 
-const { Search } = Input;
 const { Option } = Select;
-const { Title, Text } = Typography;
 
 // --- Interface ---
 interface Book {
@@ -66,615 +70,502 @@ interface Book {
   authors: string;
 }
 
+// Helper: Resolve Image URL
+const resolveImageSrc = (img: string | null) => {
+    if (!img) return "/books/default.jpg"; // Ảnh mặc định nếu null
+    if (img.startsWith("http")) return img;
+    return `/api/get_file?file=${img}`;
+};
+
 export default function AdminBooks() {
   const router = useRouter();
   
-  // --- State Management ---
+  // --- State ---
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+  
+  // Filter State
   const [searchText, setSearchText] = useState("");
-  const [filterLanguage, setFilterLanguage] = useState("all");
   const [filterCategory, setFilterCategory] = useState<number | "all">("all");
   const [filterAuthor, setFilterAuthor] = useState<number | "all">("all");
 
-  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
-  const [editingBook, setEditingBook] = useState<Book | null>(null);
+  // Modal State
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
+  const [currentBookId, setCurrentBookId] = useState<number | null>(null);
 
-  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
-  const [newBook, setNewBook] = useState<any>({
-    Title: "",
-    Description: "",
-    ISBN: "",
-    PublishYear: new Date().getFullYear(),
-    Language: "",
-    DocumentType: "",
-    publisher_id: null,
-    category_id: null,
-    author_ids: [],
-    image: "",
-    document: "",
-    IsPublic: 1,
-  });
-
+  // Data Selects
   const [categories, setCategories] = useState<any[]>([]);
   const [publishers, setPublishers] = useState<any[]>([]);
   const [authors, setAuthors] = useState<any[]>([]);
 
-  // --- Styles Constants ---
-  const pageStyle: React.CSSProperties = {
-    padding: "24px",
-    background: "#f0f2f5", // Nền xám nhạt hiện đại
-    minHeight: "100vh",
-  };
-
-  const cardStyle: React.CSSProperties = {
-    borderRadius: "12px",
-    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
-    border: "none",
-    marginBottom: "24px",
-  };
+  const [form] = Form.useForm();
 
   // --- Effects ---
   useEffect(() => {
-    fetchBooks();
-    fetchAuthorsAndCategories();
-    fetchPublishers();
-    checkUser();
+    fetchInitialData();
   }, []);
 
-  // --- API Functions ---
+  const fetchInitialData = async () => {
+    setLoading(true);
+    await Promise.all([fetchBooks(), fetchAuthorsAndCategories(), fetchPublishers()]);
+    setLoading(false);
+  };
+
   const fetchBooks = async () => {
     try {
-      const token = await getAuthCookie();
-      if (!token) {
-        message.error("Bạn chưa đăng nhập");
-        router.push("/");
-        return;
-      }
-      const response = await get_book_admin();
-      if (response.success && response.data) {
-        setBooks(response.data);
-      } else {
-        message.error(response.message || "Không thể tải danh sách sách");
-      }
-    } catch (error) {
-      console.error("Error fetching books:", error);
-    } finally {
-      setLoading(false);
-    }
+        const token = await getAuthCookie();
+        if(!token) return;
+        const response = await get_book_admin();
+        if (response.success) setBooks(response.data || []);
+    } catch (e) { console.error(e); }
   };
 
   const fetchAuthorsAndCategories = async () => {
-    try {
-      const response = await get_authors_and_categories();
-      if (response.success && response.data) {
-        setAuthors(response.data.authors || []);
-        setCategories(response.data.categories || []);
-      }
-    } catch (error) {
-      console.error(error);
+    const res = await get_authors_and_categories();
+    if(res.success) {
+        setAuthors(res.data.authors || []);
+        setCategories(res.data.categories || []);
     }
   };
 
   const fetchPublishers = async () => {
-    try {
-      const response = await get_publishers();
-      if (response.success && response.data) {
-        setPublishers(response.data || []);
-      }
-    } catch (error) {
-      console.error(error);
-    }
+    const res = await get_publishers();
+    if(res.success) setPublishers(res.data || []);
   };
 
-  const checkUser = async () => {
-    try {
-      const token = await getAuthCookie();
-      if (!token) return;
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      if (![1, 2].includes(payload.role)) {
-        message.error("Bạn không có quyền truy cập");
-        router.push("/");
-      }
-    } catch (error) {
-      router.push("/");
-    }
-  };
-
-  // --- Action Handlers ---
-  const handleAddBook = async () => {
-    try {
-      const token = await getAuthCookie();
-      if (!token) return;
-
-      if (!newBook.Title || newBook.author_ids.length === 0) {
-        message.error("Vui lòng nhập tiêu đề và chọn tác giả");
-        return;
-      }
-
-      const response = await add_book_admin(newBook);
-      if (response.success) {
-        message.success("Thêm sách thành công!");
-        setIsAddModalVisible(false);
-        setNewBook({
-            Title: "", Description: "", ISBN: "", PublishYear: new Date().getFullYear(),
-            Language: "", DocumentType: "", publisher_id: null, category_id: null,
-            author_ids: [], image: "", document: "", IsPublic: 1,
-        });
-        fetchBooks();
-      } else {
-        message.error(response.message || "Lỗi thêm sách");
-      }
-    } catch (error) {
-      message.error("Lỗi hệ thống");
-    }
-  };
-
-  const handleEdit = (record: Book) => {
-    const selectedAuthorIds = record.author_ids || authors
-      .filter((a) => record.authors?.includes(a.author_name))
-      .map((a) => a.author_id);
-
-    setEditingBook({ ...record, author_ids: selectedAuthorIds });
-    setIsEditModalVisible(true);
-  };
-
-  const handleDelete = (record: Book) => {
-    Modal.confirm({
-      title: "Cảnh báo xóa",
-      content: (
-        <div>
-            Bạn có chắc muốn xóa sách: <b>{record.Title}</b>?
-            <br/><span style={{fontSize: '12px', color: 'red'}}>Hành động này không thể hoàn tác.</span>
-        </div>
-      ),
-      okText: "Xóa ngay",
-      okType: "danger",
-      cancelText: "Hủy bỏ",
-      centered: true,
-      onOk: async () => {
-        try {
-          const response = await del_book_admin({ books_id: record.books_id });
-          if (response.success) {
-            message.success(`Đã xóa: ${record.Title}`);
-            fetchBooks();
-          } else {
-            message.error(response.message);
-          }
-        } catch (error) {
-          message.error("Lỗi khi xóa");
-        }
-      },
-    });
-  };
-
-  const handleEditSubmit = async () => {
-    if (!editingBook) return;
-    try {
-      const token = await getAuthCookie();
-      const response = await edit_book_admin({
-        token: token,
-        api_key: process.env.NEXT_PUBLIC_API_KEY,
-        datauser: editingBook,
-      });
-
-      if (response.success) {
-        message.success("Cập nhật thành công");
-        setIsEditModalVisible(false);
-        fetchBooks();
-      } else {
-        message.error(response.message);
-      }
-    } catch (error) {
-      message.error("Lỗi cập nhật");
-    }
-  };
-
-  // --- Filters Logic ---
+  // --- Filter Logic ---
   const filteredBooks = books.filter((book) => {
     const search = searchText.toLowerCase();
     const matchesSearch =
       book.Title.toLowerCase().includes(search) ||
-      book.authors?.toLowerCase().includes(search) ||
-      book.category_name?.toLowerCase().includes(search);
+      (book.authors && book.authors.toLowerCase().includes(search)) ||
+      (book.ISBN && book.ISBN.includes(search));
 
     const matchesCategory = filterCategory === "all" || book.category_id === filterCategory;
-    const matchesAuthor = filterAuthor === "all" || book.author_ids?.includes(filterAuthor as number);
+    const matchesAuthor = filterAuthor === "all" || (book.author_ids && book.author_ids.includes(filterAuthor as number));
 
     return matchesSearch && matchesCategory && matchesAuthor;
   });
 
-  // --- Table Columns ---
+  // --- Handlers ---
+  const openAddModal = () => {
+    setModalMode('add');
+    setCurrentBookId(null);
+    form.resetFields();
+    // Set default values
+    form.setFieldsValue({
+        PublishYear: new Date().getFullYear(),
+        IsPublic: 1,
+        Language: 'Tiếng Việt',
+        DocumentType: 'Sách in'
+    });
+    setIsModalVisible(true);
+  };
+
+  const openEditModal = (book: Book) => {
+    setModalMode('edit');
+    setCurrentBookId(book.books_id);
+    
+    // Map author_ids logic
+    const selectedAuthorIds = book.author_ids && book.author_ids.length > 0 
+        ? book.author_ids 
+        : authors.filter(a => book.authors?.includes(a.author_name)).map(a => a.author_id);
+
+    form.setFieldsValue({
+        ...book,
+        author_ids: selectedAuthorIds
+    });
+    setIsModalVisible(true);
+  };
+
+  const handleModalSubmit = async () => {
+    try {
+        const values = await form.validateFields();
+        const token = await getAuthCookie();
+        if(!token) return;
+
+        // Chuẩn bị payload
+        const bookData = {
+            ...values,
+            books_id: currentBookId, // Chỉ dùng cho Edit
+            author_ids: values.author_ids || []
+        };
+
+        let response;
+        if(modalMode === 'add') {
+             response = await add_book_admin(bookData);
+        } else {
+             response = await edit_book_admin({
+                token,
+                api_key: process.env.NEXT_PUBLIC_API_KEY,
+                datauser: bookData
+             });
+        }
+
+        if(response.success) {
+            message.success(modalMode === 'add' ? 'Thêm sách thành công' : 'Cập nhật thành công');
+            setIsModalVisible(false);
+            fetchBooks();
+        } else {
+            message.error(response.message || 'Thao tác thất bại');
+        }
+
+    } catch (e) { console.error(e); }
+  };
+
+  const handleDelete = (book: Book) => {
+    Modal.confirm({
+        title: 'Xác nhận xóa',
+        content: `Bạn có chắc muốn xóa sách "${book.Title}"?`,
+        okText: 'Xóa',
+        okType: 'danger',
+        cancelText: 'Hủy',
+        centered: true,
+        onOk: async () => {
+            const res = await del_book_admin({ books_id: book.books_id });
+            if(res.success) {
+                message.success('Đã xóa sách');
+                fetchBooks();
+            } else {
+                message.error(res.message);
+            }
+        }
+    });
+  };
+
+  // --- Upload Handlers ---
+  const handleUploadChange = (info: UploadChangeParam, field: string) => {
+      if (info.file.status === 'done') {
+          message.success(`${field === 'image' ? 'Ảnh' : 'File'} tải lên thành công`);
+          form.setFieldValue(field, info.file.response.filepath);
+      } else if (info.file.status === 'error') {
+          message.error('Tải lên thất bại');
+      }
+  };
+
+  // --- Render Components ---
+
+  // 1. Grid View Card Component
+  const BookGridCard = ({ book }: { book: Book }) => (
+      <div className="group bg-white rounded-2xl p-4 border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col h-full relative overflow-hidden">
+          {/* Status Badge */}
+          <div className={`absolute top-4 right-4 z-10 px-2 py-1 rounded-full text-xs font-bold ${book.IsPublic ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-500'}`}>
+              {book.IsPublic ? 'Public' : 'Private'}
+          </div>
+
+          {/* Image */}
+          <div className="relative w-full aspect-[2/3] rounded-xl overflow-hidden mb-4 bg-gray-50 shadow-inner">
+             <Image 
+                src={resolveImageSrc(book.image)}
+                alt={book.Title}
+                fill
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                className="object-cover group-hover:scale-105 transition-transform duration-500"
+             />
+             {/* Overlay Actions */}
+             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-[2px]">
+                <Button 
+                    type="primary" shape="circle" icon={<Edit size={16} />} 
+                    onClick={() => openEditModal(book)}
+                    className="bg-indigo-500 border-indigo-500 hover:bg-indigo-600"
+                />
+                <Button 
+                    type="primary" shape="circle" danger icon={<Trash2 size={16} />} 
+                    onClick={() => handleDelete(book)}
+                />
+             </div>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 flex flex-col">
+             <h3 className="font-bold text-gray-800 line-clamp-2 mb-1 min-h-[40px]" title={book.Title}>{book.Title}</h3>
+             <p className="text-sm text-gray-500 mb-2 line-clamp-1">{book.authors || 'Chưa rõ tác giả'}</p>
+             
+             <div className="mt-auto flex items-center justify-between">
+                <Tag color="blue" className="rounded-md border-0 bg-blue-50 text-blue-600 m-0 text-xs">
+                    {book.category_name || 'Khác'}
+                </Tag>
+                <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-1 rounded">
+                    {book.PublishYear || 'N/A'}
+                </span>
+             </div>
+          </div>
+      </div>
+  );
+
+  // 2. Table Columns
   const columns = [
     {
-      title: "Bìa sách",
-      dataIndex: "image",
-      key: "image",
-      width: 90,
-      render: (img: string) => (
-        <div style={{ 
-            position: 'relative', 
-            width: 60, 
-            height: 85, 
-            borderRadius: 6, 
-            overflow: 'hidden', 
-            boxShadow: '0 2px 6px rgba(0,0,0,0.1)' 
-        }}>
-            <Image 
-                src={img ? `/api/get_file?file=${img}` : "/books/default.jpg"}
-                alt="Book cover"
-                fill
-                sizes="80px"
-                style={{ objectFit: 'cover' }}
-                unoptimized={true} // Bật cái này nếu ảnh từ API nội bộ
-            />
-        </div>
-      ),
+        title: 'Bìa sách',
+        dataIndex: 'image',
+        key: 'image',
+        width: 80,
+        render: (img: string) => (
+            <div className="relative w-12 h-16 rounded-md overflow-hidden shadow-sm border border-gray-100">
+                <Image src={resolveImageSrc(img)} alt="cover" fill className="object-cover" sizes="50px" />
+            </div>
+        )
     },
     {
-      title: "Thông tin sách",
-      dataIndex: "Title",
-      key: "Title",
-      render: (text: string, record: Book) => (
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <Text strong style={{ fontSize: '15px', color: '#1890ff' }}>{text}</Text>
-              <Text type="secondary" style={{ fontSize: '12px' }}>
-                <ReadOutlined style={{ marginRight: 4 }} /> 
-                {record.authors || 'Chưa cập nhật'}
-              </Text>
-              <div style={{ marginTop: 4 }}>
-                  <Tag color="cyan">{record.category_name}</Tag>
-                  {record.PublishYear > 0 && <Tag>{record.PublishYear}</Tag>}
-              </div>
-          </div>
-      )
+        title: 'Thông tin sách',
+        dataIndex: 'Title',
+        key: 'Title',
+        render: (text: string, record: Book) => (
+            <div>
+                <div className="font-bold text-gray-800 text-base mb-1 hover:text-indigo-600 transition-colors cursor-pointer" onClick={() => openEditModal(record)}>{text}</div>
+                <div className="text-sm text-gray-500 flex items-center gap-2">
+                    <span className="bg-gray-100 px-2 py-0.5 rounded text-xs">{record.authors || 'No Author'}</span>
+                    <span className="text-gray-300">•</span>
+                    <span className="text-xs">{record.PublishYear}</span>
+                </div>
+            </div>
+        )
     },
     {
-      title: "Trạng thái",
-      dataIndex: "IsPublic",
-      key: "IsPublic",
-      width: 120,
-      align: 'center' as const,
-      render: (val: number) => (
-        <Tag 
-            color={val === 1 ? "success" : "default"} 
-            style={{ borderRadius: '12px', padding: '0 10px', fontWeight: 500 }}
-        >
-          {val === 1 ? "Công khai" : "Riêng tư"}
-        </Tag>
-      ),
+        title: 'Danh mục',
+        dataIndex: 'category_name',
+        key: 'category_name',
+        width: 150,
+        render: (cat: string) => <Tag color="geekblue" className="rounded-full px-3 bg-indigo-50 text-indigo-600 border-0">{cat}</Tag>
     },
     {
-      title: "Hành động",
-      key: "actions",
-      width: 120,
-      fixed: "right" as const,
-      align: 'center' as const,
-      render: (_: any, record: Book) => (
-        <Space>
-          <Tooltip title="Chỉnh sửa">
-            <Button
-                type="text"
-                shape="circle"
-                icon={<EditOutlined style={{ color: '#1890ff' }} />}
-                onClick={() => handleEdit(record)}
-            />
-          </Tooltip>
-          <Tooltip title="Xóa">
-            <Button
-                type="text"
-                shape="circle"
-                danger
-                icon={<DeleteOutlined />}
-                onClick={() => handleDelete(record)}
-            />
-          </Tooltip>
-        </Space>
-      ),
+        title: 'Trạng thái',
+        dataIndex: 'IsPublic',
+        key: 'IsPublic',
+        width: 120,
+        render: (val: number) => (
+            <div className={`flex items-center gap-1.5 text-sm font-medium ${val ? 'text-emerald-600' : 'text-gray-500'}`}>
+                {val ? <Eye size={16} /> : <EyeOff size={16} />}
+                {val ? 'Công khai' : 'Riêng tư'}
+            </div>
+        )
     },
+    {
+        title: '',
+        key: 'actions',
+        width: 100,
+        render: (_: any, record: Book) => (
+            <div className="flex justify-end gap-2">
+                <Button type="text" shape="circle" icon={<Edit size={18} className="text-blue-500" />} onClick={() => openEditModal(record)} className="hover:bg-blue-50" />
+                <Button type="text" shape="circle" danger icon={<Trash2 size={18} />} onClick={() => handleDelete(record)} className="hover:bg-red-50" />
+            </div>
+        )
+    }
   ];
 
-  // --- Render Main ---
   return (
-    <div style={pageStyle}>
-      {/* --- HEADER SECTION --- */}
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <Title level={2} style={{ margin: 0, color: '#262626' }}>Quản lý Thư viện</Title>
-            <Text type="secondary">Quản lý sách, tài liệu và ấn phẩm điện tử</Text>
-          </div>
-          <Button
-            type="primary"
-            size="large"
-            icon={<PlusOutlined />}
-            onClick={() => setIsAddModalVisible(true)}
-            style={{ 
-                borderRadius: '8px', 
-                height: '45px', 
-                padding: '0 25px', 
-                boxShadow: '0 4px 14px 0 rgba(24,144,255,0.3)',
-                fontWeight: 600
-            }}
-          >
-            Thêm sách
-          </Button>
-      </div>
+    <div className="min-h-screen bg-gray-50/50 p-6 space-y-6">
+        {/* --- Header --- */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 className="text-3xl font-bold text-gray-800 tracking-tight flex items-center gap-2">
+                    <BookOpen className="text-indigo-600" /> Quản lý Sách
+                </h1>
+                <p className="text-gray-500 mt-1 text-sm">Kho lưu trữ tài liệu kỹ thuật số và sách in</p>
+            </div>
+            <div className="flex items-center gap-3 bg-white p-1 rounded-full border border-gray-200 shadow-sm">
+                <Button 
+                    type={viewMode === 'table' ? 'primary' : 'text'} 
+                    shape="circle" 
+                    icon={<ListIcon size={18} />} 
+                    onClick={() => setViewMode('table')}
+                    className={viewMode === 'table' ? 'bg-indigo-600' : 'text-gray-500'}
+                />
+                <Button 
+                    type={viewMode === 'grid' ? 'primary' : 'text'} 
+                    shape="circle" 
+                    icon={<LayoutGrid size={18} />} 
+                    onClick={() => setViewMode('grid')}
+                    className={viewMode === 'grid' ? 'bg-indigo-600' : 'text-gray-500'}
+                />
+                <div className="w-px h-6 bg-gray-200 mx-1"></div>
+                <Button 
+                    type="primary" 
+                    icon={<Plus size={18} />} 
+                    onClick={openAddModal}
+                    className="bg-gradient-to-r from-indigo-500 to-purple-600 border-0 rounded-full h-9 px-5 shadow-md hover:shadow-lg transition-all"
+                >
+                    Thêm sách
+                </Button>
+            </div>
+        </div>
 
-      {/* --- FILTER TOOLBAR --- */}
-      <Card style={cardStyle} bodyStyle={{ padding: '16px 24px' }}>
-          <Row gutter={[16, 16]} align="middle">
-              <Col xs={24} md={8}>
-                  <Input 
-                    placeholder="Tìm kiếm tên sách, tác giả..." 
-                    prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-                    size="large"
-                    allowClear
-                    onChange={(e) => setSearchText(e.target.value)}
-                    style={{ borderRadius: '8px' }}
-                  />
-              </Col>
-              <Col xs={24} md={1}>
-                  <Divider type="vertical" style={{ height: '30px' }} />
-              </Col>
-              <Col xs={12} md={5}>
-                 <Space direction="vertical" style={{ width: '100%' }} size={4}>
-                     <Text type="secondary" style={{ fontSize: '12px' }}>DANH MỤC</Text>
-                     <Select
-                        value={filterCategory}
-                        onChange={setFilterCategory}
-                        style={{ width: '100%' }}
-                        size="large"
-                        suffixIcon={<FilterOutlined />}
-                    >
-                        <Option value="all">Tất cả</Option>
-                        {categories.map((c) => (
-                            <Option key={c.category_id} value={c.category_id}>{c.category_name}</Option>
+        {/* --- Filters --- */}
+        <Card bordered={false} className="shadow-sm rounded-xl overflow-hidden">
+             <div className="flex flex-col md:flex-row gap-4 p-1">
+                <div className="flex-1 relative group">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition-colors" size={18} />
+                    <Input 
+                        placeholder="Tìm kiếm sách, tác giả, ISBN..." 
+                        className="pl-10 h-10 rounded-lg border-gray-200 hover:border-indigo-400 focus:border-indigo-500"
+                        onChange={(e) => setSearchText(e.target.value)}
+                    />
+                </div>
+                <Select 
+                    defaultValue="all" 
+                    className="w-full md:w-48 h-10"
+                    onChange={setFilterCategory}
+                    suffixIcon={<Filter size={14} />}
+                    options={[{value: 'all', label: 'Tất cả danh mục'}, ...categories.map(c => ({value: c.category_id, label: c.category_name}))]}
+                />
+                 <Select 
+                    defaultValue="all" 
+                    className="w-full md:w-48 h-10"
+                    onChange={setFilterAuthor}
+                    showSearch
+                    optionFilterProp="label"
+                    options={[{value: 'all', label: 'Tất cả tác giả'}, ...authors.map(a => ({value: a.author_id, label: a.author_name}))]}
+                />
+             </div>
+        </Card>
+
+        {/* --- Content --- */}
+        {loading ? (
+            <div className="h-64 flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+            </div>
+        ) : filteredBooks.length === 0 ? (
+            <Empty description="Không tìm thấy sách nào" className="mt-20" />
+        ) : (
+            <>
+                {viewMode === 'table' ? (
+                     <Card bordered={false} className="shadow-lg shadow-gray-200/50 rounded-2xl overflow-hidden" bodyStyle={{ padding: 0 }}>
+                        <Table 
+                            columns={columns} 
+                            dataSource={filteredBooks} 
+                            rowKey="books_id" 
+                            pagination={{ pageSize: 8, className: "p-4" }}
+                            className="custom-table"
+                        />
+                     </Card>
+                ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                        {filteredBooks.map(book => (
+                            <BookGridCard key={book.books_id} book={book} />
                         ))}
-                    </Select>
-                 </Space>
-              </Col>
-              <Col xs={12} md={5}>
-                <Space direction="vertical" style={{ width: '100%' }} size={4}>
-                     <Text type="secondary" style={{ fontSize: '12px' }}>TÁC GIẢ</Text>
-                     <Select
-                        value={filterAuthor}
-                        onChange={setFilterAuthor}
-                        style={{ width: '100%' }}
-                        size="large"
-                        showSearch
-                        optionFilterProp="children"
-                        filterOption={(input, option) => (option?.children as unknown as string).toLowerCase().includes(input.toLowerCase())}
-                    >
-                        <Option value="all">Tất cả</Option>
-                        {authors.map((a) => (
-                            <Option key={a.author_id} value={a.author_id}>{a.author_name}</Option>
-                        ))}
-                    </Select>
-                 </Space>
-              </Col>
-          </Row>
-      </Card>
-
-      {/* --- DATA TABLE --- */}
-      <Card style={{ ...cardStyle, overflow: 'hidden' }} bodyStyle={{ padding: 0 }}>
-          <Table
-            columns={columns}
-            dataSource={filteredBooks}
-            rowKey="books_id"
-            loading={loading}
-            pagination={{ 
-                pageSize: 8, 
-                showSizeChanger: false, 
-                position: ['bottomCenter'],
-                style: { padding: '20px 0' }
-            }}
-            rowClassName={() => 'editable-row'}
-          />
-      </Card>
-
-      {/* --- MODAL EDIT --- */}
-      <Modal
-        title={<div style={{ fontSize: '18px', fontWeight: 600 }}>✏️ Chỉnh sửa sách</div>}
-        open={isEditModalVisible}
-        onOk={handleEditSubmit}
-        onCancel={() => setIsEditModalVisible(false)}
-        width={800}
-        okText="Lưu thay đổi"
-        cancelText="Hủy"
-        centered
-        styles={{ body: { padding: '24px 0 0 0' } }}
-      >
-        {editingBook && (
-          <Form layout="vertical">
-            <Row gutter={24}>
-              <Col span={16}>
-                  <Row gutter={16}>
-                    <Col span={24}>
-                        <Form.Item label="Tiêu đề sách" required>
-                            <Input size="large" value={editingBook.Title} onChange={(e) => setEditingBook({ ...editingBook, Title: e.target.value })} />
-                        </Form.Item>
-                    </Col>
-                    <Col span={12}>
-                        <Form.Item label="Danh mục">
-                            <Select size="large" value={editingBook.category_id} onChange={(v) => setEditingBook({ ...editingBook, category_id: v })}>
-                                {categories.map((c) => <Option key={c.category_id} value={c.category_id}>{c.category_name}</Option>)}
-                            </Select>
-                        </Form.Item>
-                    </Col>
-                    <Col span={12}>
-                        <Form.Item label="Tác giả" required>
-                            <Select size="large" mode="multiple" value={editingBook.author_ids} onChange={(vals) => setEditingBook({ ...editingBook, author_ids: vals })}>
-                                {authors.map((a) => <Option key={a.author_id} value={a.author_id}>{a.author_name}</Option>)}
-                            </Select>
-                        </Form.Item>
-                    </Col>
-                    <Col span={24}>
-                        <Form.Item label="Mô tả tóm tắt">
-                            <Input.TextArea rows={4} value={editingBook.Description} onChange={(e) => setEditingBook({ ...editingBook, Description: e.target.value })} />
-                        </Form.Item>
-                    </Col>
-                  </Row>
-              </Col>
-              
-              {/* Cột bên phải cho Ảnh và Upload */}
-              <Col span={8}>
-                 <div style={{ background: '#fafafa', padding: 16, borderRadius: 8, textAlign: 'center' }}>
-                    <Form.Item label="Ảnh bìa" style={{ marginBottom: 12 }}>
-                        <Upload
-                            name="file" listType="picture-card" showUploadList={false}
-                            action="/api/upload_file" data={{ tieuChuan: "book", tieuChi: "image" }}
-                            onChange={(info) => {
-                                if (info.file.status === "done") {
-                                    setEditingBook({ ...editingBook, image: info.file.response.filepath });
-                                    message.success("Đã tải ảnh lên");
-                                }
-                            }}
-                        >
-                            {editingBook.image ? (
-                                <img src={`/api/get_file?file=${editingBook.image}`} alt="cover" style={{ width: "100%", height: '100%', objectFit: 'cover', borderRadius: 4 }} />
-                            ) : <div><UploadOutlined /><div style={{ marginTop: 8 }}>Tải ảnh</div></div>}
-                        </Upload>
-                    </Form.Item>
-
-                    <Form.Item label="File PDF" style={{ marginBottom: 0 }}>
-                        <Upload
-                            name="file" showUploadList={false}
-                            action="/api/upload_file" data={{ tieuChuan: "book", tieuChi: "document" }}
-                            onChange={(info) => {
-                                if (info.file.status === "done") {
-                                    setEditingBook({ ...editingBook, document: info.file.response.filepath });
-                                    message.success("Đã tải PDF lên");
-                                }
-                            }}
-                        >
-                            <Button icon={<UploadOutlined />} block>{editingBook.document ? "Thay đổi PDF" : "Tải PDF lên"}</Button>
-                        </Upload>
-                    </Form.Item>
-                 </div>
-                 
-                 <div style={{ marginTop: 16 }}>
-                    <Form.Item label="Trạng thái">
-                        <Select value={editingBook.IsPublic} onChange={(v) => setEditingBook({ ...editingBook, IsPublic: v })}>
-                            <Option value={0}>Riêng tư (Private)</Option>
-                            <Option value={1}>Công khai (Public)</Option>
-                        </Select>
-                    </Form.Item>
-                 </div>
-              </Col>
-            </Row>
-
-            {/* Các trường phụ ẩn bớt trong Collapse hoặc để dưới cùng */}
-            <Divider plain>Thông tin chi tiết</Divider>
-            <Row gutter={16}>
-                <Col span={6}><Form.Item label="ISBN"><Input value={editingBook.ISBN} onChange={(e) => setEditingBook({ ...editingBook, ISBN: e.target.value })} /></Form.Item></Col>
-                <Col span={6}><Form.Item label="Năm XB"><Input type="number" value={editingBook.PublishYear} onChange={(e) => setEditingBook({ ...editingBook, PublishYear: parseInt(e.target.value) })} /></Form.Item></Col>
-                <Col span={6}><Form.Item label="Ngôn ngữ"><Input value={editingBook.Language} onChange={(e) => setEditingBook({ ...editingBook, Language: e.target.value })} /></Form.Item></Col>
-                <Col span={6}><Form.Item label="Loại"><Input value={editingBook.DocumentType} onChange={(e) => setEditingBook({ ...editingBook, DocumentType: e.target.value })} /></Form.Item></Col>
-                <Col span={12}>
-                    <Form.Item label="Nhà xuất bản">
-                        <Select value={editingBook.publisher_id} onChange={(v) => setEditingBook({ ...editingBook, publisher_id: v })}>
-                            {publishers.map((p) => <Option key={p.publisher_id} value={p.publisher_id}>{p.publisher_name}</Option>)}
-                        </Select>
-                    </Form.Item>
-                </Col>
-            </Row>
-          </Form>
+                    </div>
+                )}
+            </>
         )}
-      </Modal>
 
-      {/* --- MODAL ADD --- */}
-      <Modal
-        title={<div style={{ fontSize: '18px', fontWeight: 600 }}>📚 Thêm sách</div>}
-        open={isAddModalVisible}
-        onOk={handleAddBook}
-        onCancel={() => setIsAddModalVisible(false)}
-        width={800}
-        okText="Thêm ngay"
-        cancelText="Hủy"
-        centered
-        styles={{ body: { padding: '24px 0 0 0' } }}
-      >
-        <Form layout="vertical">
-          <Row gutter={24}>
-              <Col span={16}>
-                  <Form.Item label="Tiêu đề sách" required>
-                    <Input size="large" placeholder="Nhập tên sách..." value={newBook.Title} onChange={(e) => setNewBook({ ...newBook, Title: e.target.value })} />
-                  </Form.Item>
-                  <Row gutter={16}>
-                      <Col span={12}>
-                        <Form.Item label="Tác giả" required>
-                            <Select size="large" mode="multiple" placeholder="Chọn tác giả" value={newBook.author_ids} onChange={(vals) => setNewBook({ ...newBook, author_ids: vals })}>
-                            {authors.map((a) => <Option key={a.author_id} value={a.author_id}>{a.author_name}</Option>)}
-                            </Select>
+        {/* --- ADD / EDIT MODAL --- */}
+        <Modal
+            open={isModalVisible}
+            onCancel={() => setIsModalVisible(false)}
+            onOk={handleModalSubmit}
+            title={
+                <div className="flex items-center gap-2 text-xl font-bold text-gray-800 pb-2 border-b border-gray-100">
+                    {modalMode === 'add' ? <Plus className="text-indigo-600" /> : <Edit className="text-indigo-600" />}
+                    {modalMode === 'add' ? "Thêm sách mới" : "Chỉnh sửa thông tin"}
+                </div>
+            }
+            width={900}
+            centered
+            okText={modalMode === 'add' ? "Thêm ngay" : "Lưu thay đổi"}
+            cancelText="Hủy bỏ"
+            okButtonProps={{ className: 'bg-indigo-600 h-10 px-6 rounded-lg' }}
+            cancelButtonProps={{ className: 'h-10 px-6 rounded-lg' }}
+            className="rounded-2xl"
+        >
+            <Form form={form} layout="vertical" className="pt-6">
+                <div className="grid grid-cols-12 gap-6">
+                    {/* Left Column: Main Info */}
+                    <div className="col-span-12 md:col-span-8 space-y-4">
+                        <Form.Item name="Title" label="Tiêu đề sách" rules={[{ required: true, message: "Nhập tên sách" }]}>
+                            <Input size="large" className="rounded-lg font-medium" placeholder="Ví dụ: Đắc Nhân Tâm" />
                         </Form.Item>
-                      </Col>
-                      <Col span={12}>
-                        <Form.Item label="Danh mục">
-                            <Select size="large" placeholder="Chọn danh mục" value={newBook.category_id} onChange={(v) => setNewBook({ ...newBook, category_id: v })}>
-                            {categories.map((c) => <Option key={c.category_id} value={c.category_id}>{c.category_name}</Option>)}
-                            </Select>
-                        </Form.Item>
-                      </Col>
-                  </Row>
-                  <Form.Item label="Mô tả">
-                    <Input.TextArea rows={3} placeholder="Tóm tắt nội dung..." value={newBook.Description} onChange={(e) => setNewBook({ ...newBook, Description: e.target.value })} />
-                  </Form.Item>
-              </Col>
-              
-              <Col span={8}>
-                 <div style={{ background: '#f5f5f5', padding: 16, borderRadius: 8, textAlign: 'center' }}>
-                    <Form.Item label="Ảnh bìa" style={{marginBottom: 12}}>
-                        <Upload
-                            name="file" listType="picture-card" showUploadList={false}
-                            action="/api/upload_file" data={{ tieuChuan: "book", tieuChi: "image" }}
-                            onChange={(info) => {
-                                if (info.file.status === "done") {
-                                    setNewBook((prev: any) => ({ ...prev, image: info.file.response.filepath }));
-                                    message.success("Đã tải ảnh");
-                                }
-                            }}
-                        >
-                            {newBook.image ? (
-                                <img src={`/api/get_file?file=${newBook.image}`} alt="cover" style={{ width: "100%", height: '100%', objectFit: 'cover' }} />
-                            ) : <div><PlusOutlined /><div style={{ marginTop: 8 }}>Ảnh bìa</div></div>}
-                        </Upload>
-                    </Form.Item>
-                    
-                    <Form.Item style={{ marginBottom: 0 }}>
-                        <Upload
-                            name="file" showUploadList={false}
-                            action="/api/upload_file" data={{ tieuChuan: "book", tieuChi: "document" }}
-                            onChange={(info) => {
-                                if (info.file.status === "done") {
-                                    setNewBook((prev: any) => ({ ...prev, document: info.file.response.filepath }));
-                                    message.success("Đã tải PDF");
-                                }
-                            }}
-                        >
-                            <Button block icon={<UploadOutlined />}>{newBook.document ? "Đã có file PDF" : "Tải file PDF"}</Button>
-                        </Upload>
-                    </Form.Item>
-                 </div>
-              </Col>
-          </Row>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                            <Form.Item name="category_id" label="Danh mục">
+                                <Select size="large" options={categories.map(c => ({ value: c.category_id, label: c.category_name }))} placeholder="Chọn danh mục" />
+                            </Form.Item>
+                            <Form.Item name="author_ids" label="Tác giả" rules={[{ required: true }]}>
+                                <Select mode="multiple" size="large" options={authors.map(a => ({ value: a.author_id, label: a.author_name }))} placeholder="Chọn tác giả" maxTagCount={2} />
+                            </Form.Item>
+                        </div>
 
-          <Divider plain style={{ fontSize: '12px', color: '#999' }}>Thông tin bổ sung</Divider>
-          
-          <Row gutter={16}>
-            <Col span={6}><Form.Item label="Năm XB"><Input type="number" value={newBook.PublishYear} onChange={(e) => setNewBook({ ...newBook, PublishYear: parseInt(e.target.value) })} /></Form.Item></Col>
-            <Col span={6}><Form.Item label="ISBN"><Input value={newBook.ISBN} onChange={(e) => setNewBook({ ...newBook, ISBN: e.target.value })} /></Form.Item></Col>
-            <Col span={6}><Form.Item label="Ngôn ngữ"><Input value={newBook.Language} onChange={(e) => setNewBook({ ...newBook, Language: e.target.value })} /></Form.Item></Col>
-            <Col span={6}>
-                 <Form.Item label="Trạng thái">
-                    <Select value={newBook.IsPublic} onChange={(v) => setNewBook({ ...newBook, IsPublic: v })}>
-                        <Option value={1}>Public</Option>
-                        <Option value={0}>Private</Option>
-                    </Select>
-                </Form.Item>
-            </Col>
-          </Row>
-        </Form>
-      </Modal>
+                        <Form.Item name="Description" label="Mô tả tóm tắt">
+                            <Input.TextArea rows={4} className="rounded-lg" placeholder="Nội dung chính của sách..." />
+                        </Form.Item>
+
+                        <div className="grid grid-cols-3 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                             <Form.Item name="PublishYear" label="Năm XB" className="mb-0">
+                                <Input prefix={<CalendarDays size={14} className="text-gray-400"/>} type="number" className="rounded-lg" />
+                             </Form.Item>
+                             <Form.Item name="ISBN" label="ISBN" className="mb-0">
+                                <Input prefix={<Hash size={14} className="text-gray-400"/>} className="rounded-lg" />
+                             </Form.Item>
+                             <Form.Item name="Language" label="Ngôn ngữ" className="mb-0">
+                                <Input prefix={<Languages size={14} className="text-gray-400"/>} className="rounded-lg" />
+                             </Form.Item>
+                        </div>
+                    </div>
+
+                    {/* Right Column: Files & Status */}
+                    <div className="col-span-12 md:col-span-4 flex flex-col gap-4">
+                         {/* Image Upload */}
+                         <Form.Item name="image" noStyle>
+                            <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center hover:border-indigo-400 transition-colors bg-white">
+                                <div className="relative w-full aspect-[2/3] bg-gray-50 rounded-lg mb-3 overflow-hidden flex items-center justify-center">
+                                    <Form.Item shouldUpdate={(prev, curr) => prev.image !== curr.image} noStyle>
+                                        {({ getFieldValue }) => {
+                                            const img = getFieldValue('image');
+                                            return img ? (
+                                                <Image src={resolveImageSrc(img)} alt="preview" fill className="object-cover" />
+                                            ) : (
+                                                <div className="text-gray-300"><Image size={40} className="mx-auto" /></div>
+                                            );
+                                        }}
+                                    </Form.Item>
+                                </div>
+                                <Upload 
+                                    showUploadList={false} 
+                                    action="/api/upload_file" 
+                                    data={{ tieuChuan: "book", tieuChi: "image" }}
+                                    onChange={(info) => handleUploadChange(info, 'image')}
+                                >
+                                    <Button icon={<UploadIcon size={14} />} size="small" className="rounded-full">Tải ảnh bìa</Button>
+                                </Upload>
+                            </div>
+                         </Form.Item>
+
+                         {/* PDF Upload */}
+                         <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                            <div className="flex items-center gap-2 mb-2 text-blue-800 font-medium">
+                                <FileText size={18} /> Tài liệu PDF
+                            </div>
+                            <Form.Item name="document" noStyle>
+                                <Input type="hidden" />
+                            </Form.Item>
+                             <Upload 
+                                    showUploadList={false} 
+                                    action="/api/upload_file" 
+                                    data={{ tieuChuan: "book", tieuChi: "document" }}
+                                    onChange={(info) => handleUploadChange(info, 'document')}
+                                >
+                                    <Button block icon={<UploadIcon size={14} />} className="rounded-lg border-blue-200 text-blue-600 hover:text-blue-700 hover:border-blue-300">
+                                        Upload PDF
+                                    </Button>
+                                </Upload>
+                         </div>
+
+                         {/* Status */}
+                         <Form.Item name="IsPublic" label="Trạng thái hiển thị">
+                            <Select size="large" className="w-full">
+                                <Option value={1}><div className="flex items-center gap-2"><Eye size={16} className="text-emerald-500"/> Công khai</div></Option>
+                                <Option value={0}><div className="flex items-center gap-2"><EyeOff size={16} className="text-gray-400"/> Riêng tư</div></Option>
+                            </Select>
+                         </Form.Item>
+                         
+                         <Form.Item name="publisher_id" label="Nhà xuất bản">
+                             <Select size="large" options={publishers.map(p => ({ value: p.publisher_id, label: p.publisher_name }))} placeholder="Chọn NXB" />
+                         </Form.Item>
+                    </div>
+                </div>
+            </Form>
+        </Modal>
     </div>
   );
 }

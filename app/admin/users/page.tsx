@@ -1,41 +1,45 @@
 "use client";
-import { useEffect, useState } from "react";
-// ▼▼▼ THÊM MỚI/THAY ĐỔI IMPORT ▼▼▼
+import React, { useEffect, useState, useMemo } from "react";
+import Image from "next/image";
 import {
-  Space,
   Button,
   Input,
   Form,
   Modal,
   message,
   Popconfirm,
-  List, // <--- THÊM MỚI
-  Card, // <--- THÊM MỚI
-  Avatar, // <--- THÊM MỚI
-  Tag, // <--- THÊM MỚI
-  Row, // <--- THÊM MỚI
-  Col, // <--- THÊM MỚI
-  Select, // <--- THÊM MỚI
+  Card,
+  Tag,
+  Select,
+  Statistic,
+  Empty,
+  Tooltip
 } from "antd";
 import {
   MailOutlined,
   LockOutlined,
   DeleteOutlined,
-  CalendarOutlined, // <--- THÊM MỚI
-  UserSwitchOutlined, // <--- THÊM MỚI
+  CalendarOutlined,
+  UserSwitchOutlined,
+  SearchOutlined,
+  UserOutlined,
+  TeamOutlined,
+  SafetyCertificateOutlined,
+  EditOutlined,
+  CheckCircleOutlined
 } from "@ant-design/icons";
-// ▲▲▲ THÊM MỚI/THAY ĐỔI IMPORT ▲▲▲
 import {
   get_user,
   edit_email_admin,
   edit_pass_admin,
   del_user_admin,
-  edit_role_admin, // <--- THÊM MỚI
+  edit_role_admin,
 } from "@/app/sever/admin/route";
 import { useRouter } from "next/navigation";
-// import type { ColumnsType } from 'antd/es/table'; // <--- KHÔNG CẦN NỮA
 import { getAuthCookie } from "@/app/sever/authcookie/route";
+import dayjs from "dayjs";
 
+// --- Interfaces ---
 interface User {
   id: number;
   name: string;
@@ -44,509 +48,370 @@ interface User {
   created_at: string;
 }
 
+// --- Constants & Helpers ---
+const API_KEY = process.env.NEXT_PUBLIC_API_KEY || "YOUR_API_KEY";
+
+const getRoleConfig = (role: number) => {
+  switch (role) {
+    case 1:
+      return { label: "Admin", color: "red", icon: <SafetyCertificateOutlined /> };
+    case 2:
+      return { label: "Cán bộ", color: "blue", icon: <CheckCircleOutlined /> };
+    default:
+      return { label: "Người dùng", color: "green", icon: <UserOutlined /> };
+  }
+};
+
+const getAvatarUrl = (name: string) => 
+  `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff&size=128&bold=true`;
+
 export default function UsersPage() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [emailModalVisible, setEmailModalVisible] = useState(false);
-  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
-  const [roleModalVisible, setRoleModalVisible] = useState(false); // <--- THÊM MỚI
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [emailForm] = Form.useForm();
-  const [passwordForm] = Form.useForm();
-  const [roleForm] = Form.useForm(); // <--- THÊM MỚI
   const router = useRouter();
-
-  // ▼▼▼ THÊM MỚI STATE CHO TÌM KIẾM VÀ QUYỀN USER ▼▼▼
+  
+  // --- State ---
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
-  const [userRole, setUserRole] = useState<number | null>(null); // <--- THÊM MỚI
-  // ▲▲▲ THÊM MỚI STATE CHO TÌM KIẾM VÀ QUYỀN USER ▲▲▲
+  const [currentUserRole, setCurrentUserRole] = useState<number | null>(null);
 
+  // Modal States
+  const [modalState, setModalState] = useState<{
+    visible: boolean;
+    type: 'email' | 'password' | 'role' | null;
+    user: User | null;
+  }>({ visible: false, type: null, user: null });
+
+  const [form] = Form.useForm();
+
+  // --- Effects ---
   useEffect(() => {
+    checkAuth();
     fetchUsers();
-    Check_user();
   }, []);
 
-  const Check_user = async () => {
+  // --- Logic ---
+  const checkAuth = async () => {
     try {
       const token = await getAuthCookie();
+      if (!token) {
+        router.push("/");
+        return;
+      }
       const payload = JSON.parse(atob(token.split(".")[1]));
-      setUserRole(payload.role); // <--- LƯU QUYỀN USER
-      if (payload.role == 1 || payload.role == 2) {
-      } else {
-        message.error("Bạn không có quyền truy cập trang này");
+      setCurrentUserRole(payload.role);
+      
+      if (![1, 2].includes(payload.role)) {
+        message.error("Không có quyền truy cập");
         router.push("/");
       }
-    } catch (error: any) {
-      message.error("Máy chủ không phản hồi");
-    } finally {
-      setLoading(false);
+    } catch {
+      router.push("/");
     }
   };
 
   const fetchUsers = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const response = await get_user();
-      if (response.success) {
-        setUsers(response.data);
-      } else {
-        message.error(response.message || "Không thể tải danh sách người dùng");
-      }
-    } catch (error) {
-      message.error("Không thể tải danh sách người dùng");
+      const res = await get_user();
+      if (res.success) setUsers(res.data || []);
+      else message.error(res.message);
+    } catch (e) {
+      console.error(e);
+      message.error("Lỗi kết nối");
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle password change
-  const handlePasswordChange = async (values: { newPassword: string }) => {
-    if (!currentUser) return;
+  // --- Filter & Stats ---
+  const filteredUsers = useMemo(() => {
+    const s = searchText.toLowerCase();
+    return users.filter(u => 
+      u.name.toLowerCase().includes(s) || 
+      u.email.toLowerCase().includes(s)
+    );
+  }, [users, searchText]);
 
-    if (values.newPassword === currentUser.email) {
-      message.error("Mật khẩu không được trùng với email vì lý do bảo mật!");
-      return;
-    }
+  const stats = useMemo(() => ({
+    total: users.length,
+    admin: users.filter(u => u.role === 1).length,
+    staff: users.filter(u => u.role === 2).length,
+    user: users.filter(u => u.role === 3).length,
+  }), [users]);
 
-    try {
-      const response = await edit_pass_admin({
-        email: currentUser.email,
-        newPassword: values.newPassword,
-      });
-      if (response.success) {
-        message.success("Cập nhật mật khẩu thành công");
-        setPasswordModalVisible(false);
-        passwordForm.resetFields();
-      } else {
-        message.error(response.message || "Cập nhật mật khẩu thất bại");
-      }
-    } catch (error) {
-      message.error("Cập nhật mật khẩu thất bại");
+  // --- Actions ---
+  const handleOpenModal = (type: 'email' | 'password' | 'role', user: User) => {
+    if (currentUserRole !== 1 && (type === 'role' || type === 'email' || type === 'password')) {
+       message.warning("Chỉ Admin mới có quyền thực hiện thao tác này");
+       return;
     }
+    
+    setModalState({ visible: true, type, user });
+    form.resetFields();
+    
+    if (type === 'role') form.setFieldValue('newRole', user.role);
   };
 
-  // Handle email change
-  const handleEmailChange = async (values: { newEmail: string }) => {
-    if (!currentUser) return;
-
-    if (values.newEmail === currentUser.email) {
-      message.error("Email mới không được trùng với email cũ!");
-      return;
-    }
-
+  const handleModalSubmit = async () => {
     try {
-      const response = await edit_email_admin({
-        oldEmail: currentUser.email,
-        newEmail: values.newEmail,
-      });
+      const values = await form.validateFields();
+      const token = await getAuthCookie();
+      const targetUser = modalState.user;
+      
+      if (!targetUser || !token) return;
 
-      if (response.success) {
-        message.success("Cập nhật email thành công");
+      let res;
+      if (modalState.type === 'password') {
+        const payload = {
+            token,
+            api_key: API_KEY,
+            datauser: { email: targetUser.email, newPassword: values.newPassword }
+        };
+        res = await edit_pass_admin(payload);
+      }
+      else if (modalState.type === 'email') {
+         const payload = {
+            token,
+            api_key: API_KEY,
+            datauser: { oldEmail: targetUser.email, newEmail: values.newEmail }
+         };
+         res = await edit_email_admin(payload);
+      }
+      else if (modalState.type === 'role') {
+         const payload = {
+            token,
+            api_key: API_KEY,
+            datauser: { email: targetUser.email, newRole: values.newRole }
+         };
+         res = await edit_role_admin(payload);
+      }
+
+      if (res && res.success) {
+        message.success(res.message || "Thao tác thành công");
+        setModalState({ visible: false, type: null, user: null });
         fetchUsers();
-        setEmailModalVisible(false);
-        emailForm.resetFields();
       } else {
-        message.error(response.message || "Cập nhật email thất bại");
+        message.error(res?.message || "Thao tác thất bại");
       }
-    } catch (error) {
-      message.error("Cập nhật email thất bại");
+
+    } catch (e) {
+      console.error(e);
     }
   };
 
-  // ▼▼▼ THÊM MỚI: HANDLE ROLE CHANGE ▼▼▼
-  const handleRoleChange = async (values: { newRole: number }) => {
-    if (!currentUser) return;
-
-    try {
-      const response = await edit_role_admin({
-        email: currentUser.email,
-        newRole: values.newRole,
-      });
-
-      if (response.success) {
-        message.success("Cập nhật quyền thành công");
-        fetchUsers(); // Tải lại danh sách để cập nhật giao diện
-        setRoleModalVisible(false);
-        roleForm.resetFields();
-      } else {
-        message.error(response.message || "Cập nhật quyền thất bại");
-      }
-    } catch (error) {
-      message.error("Cập nhật quyền thất bại");
-    }
-  };
-  // ▲▲▲ THÊM MỚI: HANDLE ROLE CHANGE ▲▲▲
-
-  // Handle user deletion
   const handleDelete = async (user: User) => {
+    if (currentUserRole !== 1) {
+        message.warning("Chỉ Admin mới có quyền xóa tài khoản");
+        return;
+    }
     try {
-      const response = await del_user_admin({ email: user.email });
-      if (response.success) {
-        message.success("Xóa tài khoản thành công");
-        fetchUsers();
-      } else {
-        message.error(response.message || "Xóa tài khoản thất bại");
-      }
-    } catch (error) {
-      message.error("Xóa tài khoản thất bại");
-    }
+        const res = await del_user_admin({ email: user.email });
+        if (res.success) {
+            message.success("Đã xóa người dùng");
+            fetchUsers();
+        } else {
+            message.error(res.message);
+        }
+    } catch { message.error("Lỗi hệ thống"); }
   };
 
-  // ▼▼▼ CẬP NHẬT TÊN VAI TRÒ ▼▼▼
-  const getRoleName = (role: number) => {
-    switch (role) {
-      case 1:
-        return "Admin";
-      case 2:
-        return "Cán bộ"; // <-- Đã đổi từ 'Staff'
-      case 3:
-        return "Người dùng";
-      default:
-        return "Unknown";
-    }
-  };
-  // ▲▲▲ CẬP NHẬT TÊN VAI TRÒ ▲▲▲
-
-  // ▼▼▼ THÊM MỚI CÁC HÀM HỖ TRỢ CHO CARD ▼▼▼
-  const getRoleColor = (role: number) => {
-    switch (role) {
-      case 1:
-        return "red";
-      case 2:
-        return "blue";
-      case 3:
-        return "green";
-      default:
-        return "default";
-    }
-  };
-
-  const getInitial = (name: string) => {
-    return name ? name.charAt(0).toUpperCase() : "?";
-  };
-
-  const getAvatarColor = (name: string) => {
-    const colors = [
-      "#f56a00",
-      "#7265e6",
-      "#ffbf00",
-      "#00a2ae",
-      "#1890ff",
-      "#f5222d",
-    ];
-    let hash = 0;
-    if (name.length === 0) return colors[0];
-    for (let i = 0; i < name.length; i++) {
-      hash = name.charCodeAt(i) + ((hash << 5) - hash);
-      hash = hash & hash;
-    }
-    return colors[Math.abs(hash) % colors.length];
-  };
-
-  // Lọc người dùng dựa trên searchText
-  const filteredUsers = users.filter(
-    (user) =>
-      user.name.toLowerCase().includes(searchText.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchText.toLowerCase())
-  );
-  // ▲▲▲ THÊM MỚI CÁC HÀM HỖ TRỢ CHO CARD ▲▲▲
-
-  // ▼▼▼ THÊM MỚI: HÀM MỞ MODAL ĐỔI QUYỀN (CÓ KIỂM TRA) ▼▼▼
-  const showRoleModal = (user: User) => {
-    if (userRole !== 1) {
-      message.error("Bạn không có quyền thay đổi quyền của người dùng khác.");
-      return;
-    }
-    setCurrentUser(user);
-    setRoleModalVisible(true);
-    roleForm.setFieldsValue({ newRole: user.role }); // Set giá trị ban đầu
-  };
-  // ▲▲▲ THÊM MỚI: HÀM MỞ MODAL ĐỔI QUYỀN (CÓ KIỂM TRA) ▲▲▲
-
-  // ▼▼▼ ►►► THAY ĐỔI TOÀN BỘ GIAO DIỆN HIỂN THỊ (RETURN) ◄◄◄ ▼▼▼
   return (
-    <div className="p-6 bg-background text-foreground" style={{ minHeight: "100vh" }}>
-      <h1 className="text-2xl font-bold mb-6 text-center">
-        Quản lý Người dùng ({filteredUsers.length})
-      </h1>
+    <div className="min-h-screen bg-gray-50/50 p-6 space-y-8">
+      
+      {/* --- Header Section --- */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <h1 className="text-3xl font-bold text-gray-800 tracking-tight">Quản lý Tài khoản</h1>
+            <p className="text-gray-500 mt-1 text-sm">Quản lý quyền truy cập và thông tin người dùng hệ thống</p>
+        </div>
+        <div className="relative group w-full md:w-auto">
+            <Input 
+                prefix={<SearchOutlined className="text-gray-400 group-focus-within:text-indigo-500 transition-colors" />}
+                placeholder="Tìm tên hoặc email..." 
+                className="w-full md:w-72 rounded-full border-gray-200 hover:border-indigo-400 focus:border-indigo-500 shadow-sm py-2 px-4"
+                onChange={(e) => setSearchText(e.target.value)}
+            />
+        </div>
+      </div>
 
-      {/* Thanh tìm kiếm */}
-      <Row justify="center" className="mb-6">
-        <Col xs={24} sm={20} md={16} lg={12}>
-          <Input.Search
-            placeholder="Tìm kiếm theo Tên, Email..."
-            allowClear
-            enterButton="Tìm kiếm"
-            size="large"
-            onSearch={(value) => setSearchText(value)}
-            onChange={(e) => setSearchText(e.target.value)}
-          />
-        </Col>
-      </Row>
+      {/* --- Stats Cards --- */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+         <Card bordered={false} className="rounded-2xl shadow-sm bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
+            <Statistic title={<span className="text-indigo-100">Tổng tài khoản</span>} value={stats.total} valueStyle={{ color: 'white', fontWeight: 'bold' }} prefix={<TeamOutlined />} />
+         </Card>
+         <Card bordered={false} className="rounded-2xl shadow-sm bg-white hover:shadow-md transition-shadow">
+            <Statistic title="Quản trị viên (Admin)" value={stats.admin} valueStyle={{ color: '#ef4444', fontWeight: 'bold' }} prefix={<SafetyCertificateOutlined />} />
+         </Card>
+         <Card bordered={false} className="rounded-2xl shadow-sm bg-white hover:shadow-md transition-shadow">
+            <Statistic title="Cán bộ (Staff)" value={stats.staff} valueStyle={{ color: '#3b82f6', fontWeight: 'bold' }} prefix={<CheckCircleOutlined />} />
+         </Card>
+         <Card bordered={false} className="rounded-2xl shadow-sm bg-white hover:shadow-md transition-shadow">
+            <Statistic title="Người dùng (User)" value={stats.user} valueStyle={{ color: '#22c55e', fontWeight: 'bold' }} prefix={<UserOutlined />} />
+         </Card>
+      </div>
 
-      {/* Danh sách Card người dùng */}
-      <List
-        grid={{
-          gutter: 16,
-          xs: 1,
-          sm: 1,
-          md: 2,
-          lg: 3,
-          xl: 3,
-          xxl: 3,
-        }}
-        dataSource={filteredUsers}
-        loading={loading}
-        pagination={{
-          pageSize: 9, // Hiển thị 9 card mỗi trang
-          showTotal: (total) => `Tổng số: ${total} tài khoản`,
-          align: "center",
-          style: { marginTop: 24 },
-        }}
-        renderItem={(item) => (
-          <List.Item>
-            <Card
-              hoverable
-              className="border-border"
-              actions={[
-                item.role !== 1 && (
-                  <Button
-                    type="text"
-                    icon={<UserSwitchOutlined />}
-                    onClick={() => showRoleModal(item)}
-                  >
-                    Đổi quyền
-                  </Button>
-                ),
-                <Button
-                  type="text"
-                  icon={<MailOutlined />}
-                  onClick={() => {
-                    setCurrentUser(item);
-                    setEmailModalVisible(true);
-                    emailForm.resetFields();
-                  }}
-                >
-                  Đổi Email
-                </Button>,
-                <Button
-                  type="text"
-                  icon={<LockOutlined />}
-                  onClick={() => {
-                    setCurrentUser(item);
-                    setPasswordModalVisible(true);
-                    passwordForm.resetFields();
-                  }}
-                >
-                  Đổi mật khẩu
-                </Button>,
-                <Popconfirm
-                  title="Xóa tài khoản"
-                  description={`Bạn có chắc chắn muốn xóa tài khoản "${item.name}" (${item.email})?`}
-                  onConfirm={() => handleDelete(item)}
-                  okText="Có"
-                  cancelText="Không"
-                  okButtonProps={{ danger: true }}
-                >
-                  <Button type="text" danger icon={<DeleteOutlined />}>
-                    Xóa
-                  </Button>
-                </Popconfirm>,
-              ].filter(Boolean)}
-            >
-              <Card.Meta
-                avatar={
-                  <Avatar
-                    style={{
-                      backgroundColor: getAvatarColor(item.name),
-                      verticalAlign: "middle",
-                    }}
-                    size="large"
-                  >
-                    {getInitial(item.name)}
-                  </Avatar>
-                }
-                title={
-                  <Space>
-                    <span className="font-bold text-base text-foreground">
-                      {item.name}
-                    </span>
-                    <Tag color={getRoleColor(item.role)}>
-                      {getRoleName(item.role)}
-                    </Tag>
-                  </Space>
-                }
-              />
-              <div className="mt-5 pl-1">
-                <p className="flex items-center text-muted-foreground">
-                  <MailOutlined className="mr-2" />
-                  {item.email}
-                </p>
-                <p className="flex items-center text-muted-foreground">
-                  <CalendarOutlined className="mr-2" />
-                  Ngày tạo: {new Date(item.created_at).toLocaleDateString("vi-VN")}
-                </p>
-              </div>
-            </Card>
-          </List.Item>
-        )}
-      />
+      {/* --- User Grid --- */}
+      {loading ? (
+        <div className="h-64 flex items-center justify-center">
+             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        </div>
+      ) : filteredUsers.length === 0 ? (
+        <Empty description="Không tìm thấy người dùng nào" className="mt-12" />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
+            {filteredUsers.map((user) => {
+                const roleConf = getRoleConfig(user.role);
+                // Biến kiểm tra Admin để disable nút
+                const isAdmin = user.role === 1;
 
-      {/* Role Change Modal */}
+                return (
+                    <div key={user.id} className="group bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden">
+                        {/* Role Badge */}
+                        <div className="absolute top-4 right-4">
+                            <Tag color={roleConf.color} icon={roleConf.icon} className="mr-0 rounded-full px-3 py-0.5 border-0 font-medium">
+                                {roleConf.label}
+                            </Tag>
+                        </div>
+
+                        {/* Avatar & Basic Info */}
+                        <div className="flex items-center gap-4 mb-4">
+                            <div className="relative w-14 h-14 rounded-full overflow-hidden border-2 border-white shadow-md">
+                                <Image src={getAvatarUrl(user.name)} alt={user.name} fill className="object-cover" sizes="56px"/>
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-gray-800 text-lg line-clamp-1" title={user.name}>{user.name}</h3>
+                                <div className="flex items-center text-xs text-gray-400 gap-1">
+                                    <CalendarOutlined />
+                                    <span>{dayjs(user.created_at).format("DD/MM/YYYY")}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Details */}
+                        <div className="bg-gray-50 rounded-xl p-3 mb-4 border border-gray-100">
+                             <div className="flex items-center gap-2 text-gray-600 text-sm mb-1">
+                                <MailOutlined className="text-indigo-400" />
+                                <span className="truncate" title={user.email}>{user.email}</span>
+                             </div>
+                             <div className="flex items-center gap-2 text-gray-500 text-xs">
+                                <SafetyCertificateOutlined className="text-gray-400" />
+                                <span>ID: {user.id}</span>
+                             </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="grid grid-cols-4 gap-2 pt-2 border-t border-gray-50">
+                            {/* Nút Đổi Quyền: Hiện nhưng Disabled nếu là Admin */}
+                            <Tooltip title={isAdmin ? "Không thể đổi quyền Admin" : "Đổi Quyền"}>
+                                <Button 
+                                    block type="text" 
+                                    // Đổi màu icon thành xám nếu disabled
+                                    icon={<UserSwitchOutlined className={isAdmin ? "text-gray-400" : "text-orange-500"} />} 
+                                    // Đổi background thành xám nhẹ nếu disabled
+                                    className={`rounded-lg ${isAdmin ? "bg-gray-100 cursor-not-allowed" : "bg-orange-50 hover:bg-orange-100"}`}
+                                    onClick={() => handleOpenModal('role', user)}
+                                    disabled={isAdmin} // Disable logic giống nút Xóa
+                                />
+                            </Tooltip>
+                            
+                            <Tooltip title="Đổi Email">
+                                <Button 
+                                    block type="text" 
+                                    icon={<EditOutlined className="text-blue-500" />} 
+                                    className="bg-blue-50 hover:bg-blue-100 rounded-lg"
+                                    onClick={() => handleOpenModal('email', user)}
+                                />
+                            </Tooltip>
+                            <Tooltip title="Đổi Mật khẩu">
+                                <Button 
+                                    block type="text" 
+                                    icon={<LockOutlined className="text-indigo-500" />} 
+                                    className="bg-indigo-50 hover:bg-indigo-100 rounded-lg"
+                                    onClick={() => handleOpenModal('password', user)}
+                                />
+                            </Tooltip>
+                            <Tooltip title={isAdmin ? "Không thể xóa Admin" : "Xóa Tài khoản"}>
+                                <Popconfirm
+                                    title="Xóa tài khoản?"
+                                    description={`Bạn chắc chắn muốn xóa ${user.name}?`}
+                                    onConfirm={() => handleDelete(user)}
+                                    okText="Xóa"
+                                    okType="danger"
+                                    cancelText="Hủy"
+                                    disabled={isAdmin}
+                                >
+                                    <Button 
+                                        block type="text" danger 
+                                        icon={<DeleteOutlined className={isAdmin ? "text-gray-400" : "text-red-500"} />} 
+                                        className={`rounded-lg ${isAdmin ? "bg-gray-100 cursor-not-allowed" : "bg-red-50 hover:bg-red-100"}`}
+                                        disabled={isAdmin}
+                                    />
+                                </Popconfirm>
+                            </Tooltip>
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+      )}
+
+      {/* --- Universal Modal --- */}
       <Modal
-        title="Đổi quyền người dùng"
-        open={roleModalVisible}
-        onCancel={() => {
-          setRoleModalVisible(false);
-          roleForm.resetFields();
-        }}
-        footer={null}
+        title={
+            <div className="flex items-center gap-2 text-xl font-bold text-gray-800 pb-2 border-b border-gray-100">
+               {modalState.type === 'role' && <><UserSwitchOutlined className="text-orange-500" /> Phân quyền người dùng</>}
+               {modalState.type === 'email' && <><MailOutlined className="text-blue-500" /> Thay đổi Email</>}
+               {modalState.type === 'password' && <><LockOutlined className="text-indigo-500" /> Đặt lại mật khẩu</>}
+            </div>
+        }
+        open={modalState.visible}
+        onCancel={() => setModalState({ ...modalState, visible: false })}
+        onOk={handleModalSubmit}
+        okText="Lưu thay đổi"
+        cancelText="Hủy"
+        centered
+        okButtonProps={{ className: "bg-indigo-600 hover:bg-indigo-500 border-none h-10 px-6 rounded-lg" }}
+        cancelButtonProps={{ className: "h-10 px-6 rounded-lg hover:text-indigo-600 hover:border-indigo-600" }}
       >
-        {currentUser && (
-          <div className="mb-4">
-            <p>
-              <strong>Tài khoản:</strong> {currentUser.name}
-            </p>
-            <p>
-              <strong>Email:</strong> {currentUser.email}
-            </p>
-            <p>
-              <strong>Quyền hiện tại:</strong> {getRoleName(currentUser.role)}
-            </p>
-          </div>
-        )}
-        <Form form={roleForm} layout="vertical" onFinish={handleRoleChange}>
-          <Form.Item
-            name="newRole"
-            label="Quyền mới"
-            rules={[{ required: true, message: "Vui lòng chọn quyền mới!" }]}
-          >
-            <Select placeholder="Chọn quyền mới">
-              <Select.Option value={2}>Cán bộ</Select.Option>
-              <Select.Option value={3}>Người dùng</Select.Option>
-            </Select>
-          </Form.Item>
+         <Form form={form} layout="vertical" className="pt-4">
+             {modalState.user && (
+                 <div className="mb-6 p-3 bg-gray-50 rounded-lg border border-gray-100 flex items-center gap-3">
+                     <div className="relative w-10 h-10 rounded-full overflow-hidden">
+                        <Image src={getAvatarUrl(modalState.user.name)} alt="avt" fill className="object-cover" />
+                     </div>
+                     <div>
+                         <div className="font-bold text-gray-800">{modalState.user.name}</div>
+                         <div className="text-xs text-gray-500">{modalState.user.email}</div>
+                     </div>
+                 </div>
+             )}
 
-          <Form.Item>
-            <Space>
-              <Button type="primary" htmlType="submit">
-                Cập nhật
-              </Button>
-              <Button
-                onClick={() => {
-                  setRoleModalVisible(false);
-                  roleForm.resetFields();
-                }}
-              >
-                Hủy
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
+             {/* Form chọn quyền: Vẫn giữ Option Admin (Value=1) nếu muốn hiển thị đủ, 
+                 nhưng logic frontend đã chặn Admin mở modal này rồi nên thực tế ít khi dùng đến.
+                 Nếu bạn muốn an toàn hơn khi sửa cho User thường, có thể ẩn Option Admin đi. 
+                 Dưới đây tôi ẩn Option Admin để tránh User thường bị nâng quyền thành Admin nhầm lẫn. */}
+             {modalState.type === 'role' && (
+                 <Form.Item name="newRole" label="Vai trò mới" rules={[{ required: true }]}>
+                     <Select size="large" className="w-full">
+                         {/* Option Admin đã bị xóa để an toàn */}
+                         <Select.Option value={2}><span className="text-blue-500 font-medium">Cán bộ </span></Select.Option>
+                         <Select.Option value={3}><span className="text-green-500 font-medium">Người dùng</span></Select.Option>
+                     </Select>
+                 </Form.Item>
+             )}
 
-      {/* Email Change Modal (Giữ nguyên) */}
-      <Modal
-        title="Đổi Email"
-        open={emailModalVisible}
-        onCancel={() => {
-          setEmailModalVisible(false);
-          emailForm.resetFields();
-        }}
-        footer={null}
-      >
-        {currentUser && (
-          <div className="mb-4">
-            <p>
-              <strong>Tài khoản:</strong> {currentUser.name}
-            </p>
-            <p>
-              <strong>Email hiện tại:</strong> {currentUser.email}
-            </p>
-          </div>
-        )}
-        <Form form={emailForm} layout="vertical" onFinish={handleEmailChange}>
-          <Form.Item
-            name="newEmail"
-            label="Email mới"
-            rules={[
-              { required: true, message: "Vui lòng nhập email mới!" },
-              { type: "email", message: "Email không hợp lệ!" },
-            ]}
-          >
-            <Input placeholder="Nhập email mới" />
-          </Form.Item>
+             {modalState.type === 'email' && (
+                 <Form.Item name="newEmail" label="Địa chỉ Email mới" rules={[{ required: true, type: 'email', message: 'Email không hợp lệ' }]}>
+                     <Input size="large" prefix={<MailOutlined className="text-gray-400" />} placeholder="nhap_email_moi@example.com" />
+                 </Form.Item>
+             )}
 
-          <Form.Item>
-            <Space>
-              <Button type="primary" htmlType="submit">
-                Cập nhật
-              </Button>
-              <Button
-                onClick={() => {
-                  setEmailModalVisible(false);
-                  emailForm.resetFields();
-                }}
-              >
-                Hủy
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      {/* Password Change Modal (Giữ nguyên) */}
-      <Modal
-        title="Đổi mật khẩu"
-        open={passwordModalVisible}
-        onCancel={() => {
-          setPasswordModalVisible(false);
-          passwordForm.resetFields();
-        }}
-        footer={null}
-      >
-        {currentUser && (
-          <div className="mb-4">
-            <p>
-              <strong>Tài khoản:</strong> {currentUser.name}
-            </p>
-            <p>
-              <strong>Email:</strong> {currentUser.email}
-            </p>
-          </div>
-        )}
-        <Form
-          form={passwordForm}
-          layout="vertical"
-          onFinish={handlePasswordChange}
-        >
-          <Form.Item
-            name="newPassword"
-            label="Mật khẩu mới"
-            rules={[
-              { required: true, message: "Vui lòng nhập mật khẩu mới!" },
-              { min: 6, message: "Mật khẩu phải có ít nhất 6 ký tự!" },
-            ]}
-          >
-            <Input.Password placeholder="Nhập mật khẩu mới" />
-          </Form.Item>
-
-          <Form.Item>
-            <Space>
-              <Button type="primary" htmlType="submit">
-                Cập nhật
-              </Button>
-              <Button
-                onClick={() => {
-                  setPasswordModalVisible(false);
-                  passwordForm.resetFields();
-                }}
-              >
-                Hủy
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
+             {modalState.type === 'password' && (
+                 <Form.Item name="newPassword" label="Mật khẩu mới" rules={[{ required: true, min: 6, message: 'Tối thiểu 6 ký tự' }]}>
+                     <Input.Password size="large" prefix={<LockOutlined className="text-gray-400" />} placeholder="Nhập mật khẩu mới..." />
+                 </Form.Item>
+             )}
+         </Form>
       </Modal>
     </div>
   );
