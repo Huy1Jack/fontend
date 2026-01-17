@@ -104,7 +104,7 @@ export default function HomePage() {
                             <h1 className="text-4xl lg:text-6xl font-bold leading-tight">
                                 Thư Viện Số
                                 <br />
-                                <span className="text-yellow-300">Trường Đại Học Vinh</span>
+                                <span className="text-yellow-300">Đại Học Vinh</span>
                             </h1>
 
                             <p className="text-xl lg:text-2xl opacity-90">

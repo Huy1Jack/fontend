@@ -304,3 +304,55 @@ export async function view_count(datauser: any): Promise<any> {
         };
     }
 }
+
+export async function book_summary(data: {
+    books_id: number | string;
+}): Promise<any> {
+
+    if (!data?.books_id) {
+        return {
+            success: false,
+            message: "Thiếu books_id.",
+        };
+    }
+
+    try {
+        const response = await callPythonAPI(
+            "book-summary",
+            {
+                api_key: API_KEY,
+                data: {
+                    books_id: data.books_id
+                }
+            }
+        );
+
+        if (response.status === 200 && response.data?.success) {
+            return {
+                success: true,
+                summary: response.data.summary,
+                cached: response.data.cached ?? false
+            };
+        }
+
+        // Trường hợp response trực tiếp có success và summary
+        if (response.success && response.summary) {
+            return {
+                success: true,
+                summary: response.summary,
+                cached: response.cached ?? false
+            };
+        }
+
+        return {
+            success: false,
+            message: response.data?.message || response.message || "Không thể tạo tóm tắt AI."
+        };
+
+    } catch (error: any) {
+        return {
+            success: false,
+            message: error?.message || "Lỗi gọi AI summary."
+        };
+    }
+}

@@ -153,6 +153,7 @@ export default function AdminBorrowReturn() {
   const stats = useMemo(() => {
     return {
       total: borrowList.length,
+      pending: borrowList.filter(i => i.status === "Yêu cầu").length,
       active: borrowList.filter(i => i.status === "Đang mượn").length,
       overdue: borrowList.filter(i => i.status === "Quá hạn").length,
       returned: borrowList.filter(i => i.status === "Đã trả").length,
@@ -196,7 +197,7 @@ export default function AdminBorrowReturn() {
       form.setFieldsValue({ 
         last_updated_by: currentUser,
         borrow_date: dayjs(), // Mặc định ngày hiện tại
-        status: "Đang mượn"
+        status: "Yêu cầu"
       });
     }
     setIsModalVisible(true);
@@ -298,6 +299,7 @@ export default function AdminBorrowReturn() {
       render: (status: string) => {
         let color = "processing";
         let icon = <ClockCircleOutlined />;
+        if (status === "Yêu cầu") { color = "warning"; icon = <ClockCircleOutlined />; }
         if (status === "Đã trả") { color = "success"; icon = <CheckCircleOutlined />; }
         if (status === "Quá hạn") { color = "error"; icon = <WarningOutlined />; }
         
@@ -345,17 +347,22 @@ export default function AdminBorrowReturn() {
 
       {/* Stats Cards */}
       <Row gutter={[16, 16]}>
-        <Col xs={24} sm={8}>
+        <Col xs={24} sm={12} md={6}>
+          <Card bordered={false} className="shadow-sm rounded-xl border-l-4 border-l-yellow-500">
+            <Statistic title="Yêu cầu" value={stats.pending} valueStyle={{ color: '#eab308', fontWeight: 'bold' }} prefix={<ClockCircleOutlined />} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={6}>
           <Card bordered={false} className="shadow-sm rounded-xl border-l-4 border-l-blue-500">
             <Statistic title="Đang mượn" value={stats.active} valueStyle={{ color: '#3b82f6', fontWeight: 'bold' }} prefix={<ClockCircleOutlined />} />
           </Card>
         </Col>
-        <Col xs={24} sm={8}>
+        <Col xs={24} sm={12} md={6}>
           <Card bordered={false} className="shadow-sm rounded-xl border-l-4 border-l-red-500">
             <Statistic title="Quá hạn" value={stats.overdue} valueStyle={{ color: '#ef4444', fontWeight: 'bold' }} prefix={<WarningOutlined />} />
           </Card>
         </Col>
-        <Col xs={24} sm={8}>
+        <Col xs={24} sm={12} md={6}>
           <Card bordered={false} className="shadow-sm rounded-xl border-l-4 border-l-green-500">
             <Statistic title="Đã trả / Hoàn tất" value={stats.returned} valueStyle={{ color: '#10b981', fontWeight: 'bold' }} prefix={<CheckCircleOutlined />} />
           </Card>
@@ -379,6 +386,7 @@ export default function AdminBorrowReturn() {
             onChange={setFilterStatus}
             options={[
               { value: "all", label: "Tất cả trạng thái" },
+              { value: "Yêu cầu", label: "Yêu cầu" },
               { value: "Đang mượn", label: "Đang mượn" },
               { value: "Quá hạn", label: "Quá hạn" },
               { value: "Đã trả", label: "Đã trả" },
@@ -462,6 +470,7 @@ export default function AdminBorrowReturn() {
 
           <Form.Item label="Trạng thái" name="status" rules={[{ required: true }]}>
              <Select size="large">
+                <Option value="Yêu cầu"><Tag color="warning">Yêu cầu</Tag></Option>
                 <Option value="Đang mượn"><Tag color="processing">Đang mượn</Tag></Option>
                 <Option value="Đã trả"><Tag color="success">Đã trả</Tag></Option>
                 <Option value="Quá hạn"><Tag color="error">Quá hạn</Tag></Option>
