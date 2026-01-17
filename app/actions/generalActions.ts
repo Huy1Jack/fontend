@@ -305,6 +305,42 @@ export async function view_count(datauser: any): Promise<any> {
     }
 }
 
+export async function get_profile(): Promise<any> {
+    try {
+        const token = await getAuthCookie();
+        
+        if (!token) {
+            return {
+                success: false,
+                message: "Chưa đăng nhập.",
+            };
+        }
+
+        const response = await callPythonAPI("get_profile", {
+            api_key: API_KEY,
+            token: token,
+        });
+
+        if (response.status === 200 && response.success) {
+            return {
+                success: true,
+                data: response.data,
+            };
+        }
+
+        return {
+            success: false,
+            message: response.message || "Không thể lấy thông tin profile.",
+        };
+    } catch (error: any) {
+        console.error("Error calling get_profile:", error);
+        return {
+            success: false,
+            message: error.message || "Error calling get_profile API.",
+        };
+    }
+}
+
 export async function book_summary(data: {
     books_id: number | string;
 }): Promise<any> {

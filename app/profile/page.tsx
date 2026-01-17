@@ -13,7 +13,7 @@ import {
     BookOutlined, LockOutlined, KeyOutlined, CheckCircleOutlined
 } from '@ant-design/icons'
 import { getAuthCookie } from '@/app/actions/authActions'
-import { change_password } from '@/app/sever/route'
+import { change_password, get_profile } from '@/app/actions/generalActions'
 const { Title, Text, Paragraph } = Typography
 
 interface UserInfo {
@@ -29,8 +29,27 @@ interface UserInfo {
     exp?: number;
 }
 
+interface UserStats {
+    borrowing: number;
+    requesting: number;
+    returned: number;
+    overdue: number;
+    total_borrowed: number;
+    violations: number;
+    points: number;
+}
+
 export default function ProfilePage() {
     const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+    const [userStats, setUserStats] = useState<UserStats>({
+        borrowing: 0,
+        requesting: 0,
+        returned: 0,
+        overdue: 0,
+        total_borrowed: 0,
+        violations: 0,
+        points: 0
+    });
     const [loading, setLoading] = useState(true);
     
     // --- STATE CHO MODAL ĐỔI MẬT KHẨU ---
@@ -52,6 +71,7 @@ export default function ProfilePage() {
                     return;
                 }
 
+                // Decode token để lấy thông tin cơ bản
                 const base64Url = token.split('.')[1];
                 const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
                 const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
@@ -77,6 +97,23 @@ export default function ProfilePage() {
                     phone: payload.phone || '',
                     address: payload.address || ''
                 });
+
+                // Gọi API để lấy thống kê chi tiết
+                const profileResponse = await get_profile();
+                if (profileResponse.success && profileResponse.data) {
+                    const stats = profileResponse.data.statistics;
+                    if (stats) {
+                        setUserStats({
+                            borrowing: stats.borrowing || 0,
+                            requesting: stats.requesting || 0,
+                            returned: stats.returned || 0,
+                            overdue: stats.overdue || 0,
+                            total_borrowed: stats.total_borrowed || 0,
+                            violations: stats.violations || 0,
+                            points: stats.points || 0
+                        });
+                    }
+                }
 
             } catch (error) {
                 console.error("Error checking user:", error);
@@ -247,22 +284,44 @@ export default function ProfilePage() {
                         <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
                             <Col xs={12} sm={6}>
                                 <Card style={{ ...cardStyle, textAlign: 'center' }} bodyStyle={{ padding: 16 }}>
-                                    <Statistic title="Đang mượn" value={3} valueStyle={{ color: '#1890ff', fontWeight: 'bold' }} prefix={<ReadOutlined />} />
+                                    <Statistic 
+                                        title="Đang mượn" 
+                                        value={userStats.borrowing} 
+                                        valueStyle={{ color: '#1890ff', fontWeight: 'bold' }} 
+                                        prefix={<ReadOutlined />} 
+                                    />
+                                    {userStats.requesting > 0 && (
+                                        <Text type="secondary" style={{ fontSize: 11 }}>
+                                            +{userStats.requesting} yêu cầu
+                                        </Text>
+                                    )}
                                 </Card>
                             </Col>
                             <Col xs={12} sm={6}>
                                 <Card style={{ ...cardStyle, textAlign: 'center' }} bodyStyle={{ padding: 16 }}>
-                                    <Statistic title="Đã trả" value={27} valueStyle={{ color: '#52c41a', fontWeight: 'bold' }} />
+                                    <Statistic 
+                                        title="Đã trả" 
+                                        value={userStats.returned} 
+                                        valueStyle={{ color: '#52c41a', fontWeight: 'bold' }} 
+                                    />
                                 </Card>
                             </Col>
                             <Col xs={12} sm={6}>
                                 <Card style={{ ...cardStyle, textAlign: 'center' }} bodyStyle={{ padding: 16 }}>
-                                    <Statistic title="Vi phạm" value={0} valueStyle={{ color: '#ff4d4f', fontWeight: 'bold' }} />
+                                    <Statistic 
+                                        title="Quá hạn" 
+                                        value={userStats.overdue} 
+                                        valueStyle={{ color: '#ff4d4f', fontWeight: 'bold' }} 
+                                    />
                                 </Card>
                             </Col>
                             <Col xs={12} sm={6}>
                                 <Card style={{ ...cardStyle, textAlign: 'center' }} bodyStyle={{ padding: 16 }}>
-                                    <Statistic title="Điểm tích lũy" value={120} valueStyle={{ color: '#faad14', fontWeight: 'bold' }} />
+                                    <Statistic 
+                                        title="Điểm tích lũy" 
+                                        value={userStats.points} 
+                                        valueStyle={{ color: '#faad14', fontWeight: 'bold' }} 
+                                    />
                                 </Card>
                             </Col>
                         </Row>
