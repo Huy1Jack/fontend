@@ -50,6 +50,7 @@ import {
   book_summary,
 } from "@/app/actions/generalActions";
 import { add_borrow_return } from "@/app/actions/adminActions";
+import { getAuthCookie } from "@/app/actions/authActions";
 import Head from "next/head";
 import Image from "next/image";
 import Link from "next/link";
@@ -310,11 +311,26 @@ const BookDetailsPage: React.FC = () => {
 
     try {
       setBorrowing(true);
+      
+      // Lấy token
+      const token = await getAuthCookie();
+      
+      // Tính toán ngày mượn và ngày trả (sau 3 tuần)
+      const today = new Date();
+      const borrowDate = today.toISOString().split('T')[0]; // YYYY-MM-DD
+      
+      const dueDate = new Date(today);
+      dueDate.setDate(dueDate.getDate() + 21); // Thêm 21 ngày (3 tuần)
+      const dueDateStr = dueDate.toISOString().split('T')[0]; // YYYY-MM-DD
+      
       const borrowData = {
         user_name: user.name,
         book_title: book.Title || book.title,
-        borrow_date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+        borrow_date: borrowDate,
+        due_date: dueDateStr,
         status: "Yêu cầu",
+        last_updated_by: user.name,
+        token: token,
       };
 
       const response = await add_borrow_return(borrowData);

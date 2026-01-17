@@ -1,8 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     images: {
-        // Đã thêm 'ui-avatars.com' vào danh sách domains cho phép
-        domains: ['images.unsplash.com', 'plus.unsplash.com', 'picsum.photos', 'ui-avatars.com'],
+        // Đã thêm 'ui-avatars.com' và 'via.placeholder.com' vào danh sách domains cho phép
+        domains: ['images.unsplash.com', 'plus.unsplash.com', 'picsum.photos', 'ui-avatars.com', 'via.placeholder.com'],
     },
     optimizeFonts: false,
     typescript: {
